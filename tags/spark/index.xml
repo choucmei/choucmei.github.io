@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Spark on chouc</title>
+    <link>http://localhost:1313/tags/spark/</link>
+    <description>Recent content in Spark on chouc</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <lastBuildDate>Tue, 05 Mar 2019 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="http://localhost:1313/tags/spark/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Spark DStream的源码和原理</title>
+      <link>http://localhost:1313/dstream/</link>
+      <pubDate>Tue, 05 Mar 2019 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/dstream/</guid>
+      <description>众所周知 Spark Streaming是核心Spark API的扩展，可实现实时数据流的可伸缩，高吞吐量，容错流处理。可以从许多数据源（例如Kafka，</description>
+    </item>
+    
+    <item>
+      <title>Spark 内存管理</title>
+      <link>http://localhost:1313/spark%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</link>
+      <pubDate>Tue, 05 Mar 2019 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/spark%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</guid>
+      <description>转自 http://arganzheng.life/spark-executor-memory-management.html 我们都知道 Spark 能够有效的利用内存并进行分布式计算，其内存管理模块在整个系统中扮演着非常重要的角色。为了更好地利用 Spark，深入地理解其</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    
+    
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-12345678-0', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+    
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+      
+  Redis 入门级 &ndash; chouc
+
+    </title>
+    
+    
+    <meta name="description" property="og:description" content="Synchronize|chouc&#39;s blog">
+    
+
+    <meta name="apple-mobile-web-app-title" content="chouc">
+    
+    
+    
+    
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:site" content="@">
+    <meta name="twitter:creator" content="@">
+    <meta name="twitter:title" content="Redis 入门级 | chouc">
+    <meta name="twitter:description" content="Synchronize|chouc&#39;s blog">
+    <meta name="twitter:image" content="http://localhost:1313/twitter-card.png">
+    
+
+
+    <link rel="stylesheet" href="/assets/syntax.css">
+    <link rel="stylesheet" href="/assets/primer-build.css">
+    <link rel="stylesheet" href="/assets/style.css">
+  </head>
+
+
+  <body class="bg-gray">
+    <div id="holy" class="container-lg bg-white h-100">
+
+      <div id="header" class="px-1 bg-white">
+        <nav class="UnderlineNav UnderlineNav--right px-2">
+  <a class="UnderlineNav-actions muted-link h2" href="http://localhost:1313/">
+    chouc
+  </a>
+
+  
+  
+  <div class="UnderlineNav-body">
+    
+    
+    
+    <a class="UnderlineNav-item " href="/">
+      
+      <span>Blog</span>
+    </a>
+    
+    
+    
+    
+    <a class="UnderlineNav-item " href="/about/">
+      
+      <span>About</span>
+    </a>
+    
+    
+  </div>
+  
+</nav>
+
+      </div>
+
+      <div role="main" id="main" class="holy-main markdown-body px-4 bg-white">
+        
+
+<div class="Subhead">
+  <div class="Subhead-heading">
+    <div class="h1 mt-3 mb-1">Redis 入门级</div>
+  </div>
+  <div class="Subhead-description">
+    
+
+
+<a href='/categories/bigdata' class="muted-link">
+  <span class="Label Label--gray-darker">Bigdata</span>
+</a>
+
+
+
+<a href='/tags/redis' class="muted-link">
+  <span class="Label Label--gray">Redis</span>
+</a>
+
+
+    
+    <div class="float-md-right">
+      <span title="Lastmod: 2019-03-05. Published at: 2019-03-05.">
+        
+          Published: 2019-03-05
+        
+      </span>
+    </div>
+    
+  </div>
+</div>
+<article>
+  
+  <section class="pb-6 mb-3 border-bottom">
+    <p>众所周知<strong>Redis</strong>是一个使用<a href="https://zh.wikipedia.org/wiki/ANSI_C">ANSI C</a>编写的<a href="https://zh.wikipedia.org/wiki/%E5%BC%80%E6%BA%90">开源</a>、支持<a href="https://zh.wikipedia.org/wiki/%E7%94%B5%E8%84%91%E7%BD%91%E7%BB%9C">网络</a>、基于<a href="https://zh.wikipedia.org/wiki/%E5%86%85%E5%AD%98">内存</a>、可选<a href="https://zh.wikipedia.org/w/index.php?title=%E6%8C%81%E4%B9%85%E6%80%A7_(%E6%95%B0%E6%8D%AE%E5%BA%93)&amp;action=edit&amp;redlink=1">持久性</a>的<a href="https://zh.wikipedia.org/wiki/%E9%94%AE%E5%80%BC-%E5%80%BC%E6%95%B0%E6%8D%AE%E5%BA%93">键值对存储数据库</a>。从2015年6月开始，Redis的开发由<a href="https://zh.wikipedia.org/w/index.php?title=Redis_Labs&amp;action=edit&amp;redlink=1">Redis Labs</a>赞助，而2013年5月至2015年6月期间，其开发由<a href="https://zh.wikipedia.org/wiki/Pivotal">Pivotal</a>赞助。[<a href="https://zh.wikipedia.org/wiki/Redis#cite_note-3">3]</a>在2013年5月之前，其开发由<a href="https://zh.wikipedia.org/wiki/VMware">VMware</a>赞助。[<a href="https://zh.wikipedia.org/wiki/Redis#cite_note-4">4]</a>[<a href="https://zh.wikipedia.org/wiki/Redis#cite_note-5">5]</a>根据月度排行网站DB-Engines.com的数据，Redis是最流行的键值对存储数据库。[<a href="https://zh.wikipedia.org/wiki/Redis#cite_note-6">6]</a></p>
+<h1 id="安装">安装</h1>
+<pre><code>yum -y install gcc tcl -y
+tar xf redis-2.8.18.tar.gz
+make &amp; make PREFIX=/opt/sxt/redis install
+//全局变量
+export REDIS_HOME=/opt/redis
+export PATH=$PATH:$REDIS_HOME/bin
+</code></pre><h2 id="启动">启动</h2>
+<pre><code>// 一个端口对应一个实例
+redis-server --port 6380 
+
+redis-cli
+//帮助
+Help
+Help &lt;tab&gt;
+Help set
+Help @string
+</code></pre><h1 id="持久化">持久化</h1>
+<p>什么是持久化？</p>
+<p>将数据从掉电易失的内存存放到能够永久存储的设备上</p>
+<p>Redis为什么需要持久化？</p>
+<p>基于内存的</p>
+<h2 id="redis持久化方式">Redis持久化方式</h2>
+<p>RDB（Redis DB）  hdfs:  fsimage</p>
+<p>AOF（AppendOnlyFile）  hdfs :  edit logs  关闭的</p>
+<h2 id="rdb">RDB</h2>
+<p>###　主动</p>
+<p>客户端中执行save命令，会阻塞一切　StopWord。</p>
+<p>阻塞Redis服务，无法响应客户端请求，创建新的dump.rdb替代旧文件</p>
+<h3 id="被动-默认使用的方式">被动 (默认使用的方式)</h3>
+<p>bgsave 非阻塞，Redis服务正常接收处理客户端请求</p>
+<p>在默认情况下，Redis 将数据库快照保存在名字为 dump.rdb的二进制文件中。</p>
+<pre><code>2020 23:00:47.473 * RDB: 0 MB of memory used by copy-on-write
+</code></pre><p>自动：按照配置文件中的条件满足就执行BGSAVE</p>
+<p>配置：save 60 1000，Redis要满足在60秒内至少有1000个键被改动，会自动保存一次</p>
+<pre><code>默认配置
+save 900 1
+save 300 10
+save 60 10000
+dbfilename dump.rdb
+
+dir /var/lib/redis/6379
+只要上面三个条件满足一个，就自动执行备份。
+创建RDB文件之后，时间计数器和次数计数器会清零。所以多个条件的效果不是叠加的
+
+</code></pre><p>Redis会fork()一个新的子进程来创建RDB文件，子进程处理完后会向父进程发送一个信号，通知它处理完毕</p>
+<p>父进程用新的dump.rdb替代旧文件</p>
+<p>注意：</p>
+<pre><code>内存： 512G
+redis：400G
+
+fork（）：copy-on-writ 
+
+子进程内存中存储父进程内存的指向，不必开辟真实800G的内存占用
+父进程不会阻塞，如果客户端修改了父进程的内存，阻塞（cow）：父进程的值，会在子进程中开辟（旧的）。父进程才真正修改。：阻塞是很小。
+小的窗口：9：00  BGSAVE  10：00完成，持久化数据存储的是9：00
+
+</code></pre><p><img src="/images/image-20200312230054986.png" alt="image-20200312230054986"></p>
+<h3 id="对比-save--bgsave">对比 save &amp; bgsave</h3>
+<ul>
+<li>
+<p>SAVE 和 BGSAVE 命令</p>
+</li>
+<li>
+<p>SAVE不用创建新的进程，速度略快</p>
+</li>
+<li>
+<p>BGSAVE需要创建子进程，消耗额外的内存</p>
+</li>
+<li>
+<p>SAVE适合停机维护，服务低谷时段</p>
+</li>
+<li>
+<p>BGSAVE适合线上执行</p>
+</li>
+</ul>
+<h3 id="rdb优点">RDB优点</h3>
+<ul>
+<li>
+<p>完全备份，不同时间的数据集备份可以做到多版本恢复</p>
+</li>
+<li>
+<p>紧凑的单一文件，方便网络传输，适合灾难恢复</p>
+</li>
+<li>
+<p>恢复大数据集速度较AOF快</p>
+</li>
+</ul>
+<h3 id="rdb缺点">RDB缺点</h3>
+<ul>
+<li>
+<p>会丢失最近写入、修改的而未能持久化的数据</p>
+</li>
+<li>
+<p>fork过程非常耗时，会造成毫秒级不能响应客户端请求</p>
+</li>
+</ul>
+<h2 id="aof记录命令">AOF（记录命令）</h2>
+<p>Append only file，采用追加的方式保存，默认文件appendonly.aof</p>
+<p>记录所有的写操作命令，在服务启动的时候使用这些命令就可以还原数据库</p>
+<p>调整AOF持久化策略，可以在服务出现故障时，不丢失任何数据，也可以丢失一秒的数据。相对于RDB损失小得多</p>
+<h3 id="aof写入机制">AOF写入机制</h3>
+<h4 id="aof方式不能保证绝对不丢失数据丢失buff中的数据">AOF方式不能保证绝对不丢失数据（丢失BUFF中的数据）</h4>
+<p>目前常见的操作系统中，执行系统调用write函数，将一些内容写入到某个文件里面时，为了提高效率，系统通常不会直接将内容写入硬盘里面，而是先将内容放入一个内存缓冲区（buffer）里面，等到缓冲区被填满，或者用户执行fsync调用和fdatasync调用时才将储存在缓冲区里的内容真正的写入到硬盘里，未写入磁盘之前，数据可能会丢失</p>
+<h3 id="写入磁盘的策略">写入磁盘的策略</h3>
+<p>appendfsync选项，这个选项的值可以是always、everysec或者no</p>
+<p>Always：服务器每写入一个命令，就调用一次fdatasync，将缓冲区里面的命令写入到硬盘。这种模式下，服务器出现故障，也不会丢失任何已经成功执行的命令数据</p>
+<p>Everysec（默认）：服务器每一秒重调用一次fdatasync，将缓冲区里面的命令写入到硬盘。这种模式下，服务器出现故障，最多只丢失一秒钟内的执行的命令数据</p>
+<p>No：服务器不主动调用fdatasync，由操作系统决定何时将缓冲区里面的命令写入到硬盘。这种模式下，服务器遭遇意外停机时，丢失命令的数量是不确定的</p>
+<p>运行速度：always的速度慢，everysec和no都很快</p>
+<h3 id="aof重写机制">AOF重写机制</h3>
+<p>原因：AOF文件过大，不然重启时，启动加载的数据多。所以合并重复的命令操作，AOF会使用尽可能少的命令来记录。</p>
+<p>重写过程：</p>
+<p>fork一个子进程负责重写AOF文件，子进程会创建一个临时文件写入AOF信息，父进程会开辟一个内存缓冲区接收新的写命令，子进程重写完成后，父进程会获得一个信号，将父进程接收到的新的写操作由子进程写入到临时文件中，新文件替代旧文件</p>
+<p>注意：如果写入操作的时候出现故障导致命令写半截，可以使用redis-check-aof工具修复</p>
+<h3 id="aof重写触发">AOF重写触发</h3>
+<p>手动：客户端向服务器发送BGREWRITEAOF命令</p>
+<p>自动：配置文件中的选项，自动执行BGREWRITEAOF命令</p>
+<p>auto-aof-rewrite-min-size <!-- raw HTML omitted -->，触发AOF重写所需的最小体积：只要在AOF文件的体积大于等于size时，才会考虑是否需要进行AOF重写，这个选项用于避免对体积过小的AOF文件进行重写</p>
+<p>auto-aof-rewrite-percentage <!-- raw HTML omitted -->，指定触发重写所需的AOF文件体积百分比：当AOF文件的体积大于auto-aof-rewrite-min-size指定的体积，并且超过上一次重写之后的AOF文件体积的percent %时，就会触发AOF重写。（如果服务器刚刚启动不久，还没有进行过AOF重写，那么使用服务器启动时载入的AOF文件的体积来作为基准值）。将这个值设置为0表示关闭自动AOF重写</p>
+<p>例：</p>
+<pre><code>AOF重写配置项举例
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb
+appendonly no  /  yes
+当AOF文件大于64MB时候，可以考虑重写AOF文件
+只有当AOF文件的增量大于起始size的100%时（就是文件大小翻了一倍），启动重写
+
+默认关闭，请开启
+</code></pre><h3 id="优点">优点</h3>
+<ul>
+<li>
+<p>写入机制，默认fysnc每秒执行，性能很好不阻塞服务，最多丢失一秒的数据</p>
+</li>
+<li>
+<p>重写机制，优化AOF文件</p>
+</li>
+<li>
+<p>如果误操作了（FLUSHALL等），只要AOF未被重写，停止服务移除AOF文件尾部FLUSHALL命令，重启Redis，可以将数据集恢复到 FLUSHALL 执行之前的状态</p>
+</li>
+</ul>
+<h3 id="缺点">缺点</h3>
+<ul>
+<li>
+<p>相同数据集，AOF文件体积较RDB大了很多</p>
+</li>
+<li>
+<p>恢复数据库速度较RDB慢（文本，命令重演）</p>
+</li>
+</ul>
+<h1 id="集群">集群</h1>
+<h2 id="主从复制横向扩充">主从复制（横向扩充）</h2>
+<ul>
+<li>
+<p>一个Master，其他都为Slaves</p>
+</li>
+<li>
+<p>Master会一直将自己的数据更新同步给Slaves，保持主从同步</p>
+</li>
+<li>
+<p>只有Master可以执行写命令，Slaves只能执行读命令</p>
+</li>
+<li>
+<p>从服务器执行客户端发送的读命令，比如GET、LRANGE、SMEMMBERS、HGET、ZRANGE等等</p>
+</li>
+<li>
+<p>客户端可以连接Slaves执行读请求，来降低Master的读压力</p>
+</li>
+</ul>
+<h3 id="配置">配置</h3>
+<pre><code>Master启动（普通的实例都是主）
+redis-server --port 6380
+
+Slave启动
+redis-server --slaveof &lt;master-ip&gt; &lt;master-port&gt;，配置当前服务称为某Redis服务的Slave
+redis-server --port 6380 --slaveof 127.0.0.1 6379 
+
+
+SLAVEOF 192.168.1.1 6379 //将服务器转换为Slave
+
+SLAVEOF NO ONE  //将服务器重新恢复到Master，不会丢弃已同步数据
+
+配置方式：启动时，服务器读取配置文件，并自动成为指定服务器的从服务器
+slaveof &lt;masterip&gt; &lt;masterport&gt;
+slaveof 127.0.0.1 6379
+</code></pre><h3 id="缺点-1">缺点</h3>
+<p>Slave下线，只是读请求的处理性能下降,Master下线，写请求无法执行</p>
+<p>其中一台Slave使用SLAVEOF no one命令成为Master，其它Slaves执行SLAVEOF命令指向这个新的Master，从它这里同步数据</p>
+<p>以上过程是手动的。能够实现自动，这就需要Sentinel哨兵，实现故障转移Failover操作</p>
+<h2 id="哨兵sentinel">哨兵（Sentinel）</h2>
+<p>官方提供的高可用方案，可以用它管理多个Redis服务实例编译后产生redis-sentinel程序文件</p>
+<p>redis Sentinel是一个分布式系统，可以在一个架构中运行多个Sentinel进程。</p>
+<p>Sentinel可以监控集群，制定开始的Master 便可以获取整个主从集群的信息。当一定数量的Sentinel 发现Master挂掉的时候，Sentinel 会重新将一个Slave 提升为主。</p>
+<h3 id="配置-1">配置</h3>
+<pre><code>至少包含一个监控配置选项，用于指定被监控Master的相关信息
+Sentinel monitor&lt;name&gt;&lt;ip&gt;&lt;port&gt;&lt;quorum&gt;，例如sentinel monitor mymaster 127.0.0.1 6379 2监视mymaster的主服务器，服务器ip和端口，将这个主服务器判断为下线失效至少需要2个Sentinel同意，如果多数Sentinel同意才会执行故障转移
+Sentinel会根据Master的配置自动发现Master的Slaves
+Sentinel默认端口号为26379
+
+
+Sentinel 配置举例
+执行以下两条命令，将创建两个监视主服务器s1的sentinel实例：
+redis-sentinel sentinel1.conf
+redis-sentinel sentinel2.conf
+
+其中sentinel1.conf的内容为：
+
+port 26379
+Sentinel monitor s1 127.0.0.1 6380 2（就是票数）
+
+sentinel2.conf的内容为：
+Port 26380
+Sentinel monitor s1 127.0.0.1 6379 2 
+
+</code></pre><h3 id="优缺点">优缺点</h3>
+<ul>
+<li>
+<p>主从复制，解决了读请求的分担，从节点下线，会使得读请求能力有所下降</p>
+</li>
+<li>
+<p>Master只有一个，写请求单点问题</p>
+</li>
+<li>
+<p>Sentinel会在Master下线后自动执行Failover操作，提升一台Slave为Master，并让其他Slaves重新成为新Master的Slaves</p>
+</li>
+<li>
+<p>主从复制+哨兵Sentinel只解决了读性能和高可用问题，但是没有解决写性能问题</p>
+</li>
+</ul>
+<h2 id="redis集群30">Redis集群（3.0）</h2>
+<p>由多个Redis服务器组成的分布式网络服务集群，每一个Redis服务器称为节点Node，节点之间会互相通信。两两相连，Redis集群无中心节点</p>
+<h3 id="redis集群分片">Redis集群分片</h3>
+<p>集群将整个数据库分为16384个槽位slot，所有key都数据这些slot中的一个，key的槽位计算公式为slot_number=crc16(key)%16384，其中crc16为16位的循环冗余校验和函数</p>
+<p>集群中的每个主节点都可以处理0个至16383个槽，当16384个槽都有某个节点在负责处理时，集群进入<strong>上线状态</strong>，并开始处理客户端发送的数据命令请求。</p>
+<h3 id="master多">Master（多）</h3>
+<ul>
+<li>放一部分SLOT 数据</li>
+<li>当作一个（Sentinel）</li>
+</ul>
+<h3 id="slave多">Slave（多）</h3>
+<ul>
+<li>当作Master 从节点，当Master 挂掉就从Slave提升为Master</li>
+</ul>
+<p>Redis集群的每个节点都有两种角色可选：主节点master node、从节点slave node。其中主节点用于存储数据，而从节点则是某个主节点的复制品。</p>
+<p>当用户需要处理更多读请求的时候，添加从节点可以扩展系统的读性能，因为Redis集群重用了单机Redis复制特性的代码，所以集群的复制行为和我们之前介绍的单机复制特性的行为是完全一样的</p>
+<p>Redis集群的主节点内置了类似Redis Sentinel的节点故障检测和自动故障转移功能，当集群中的某个主节点下线时，集群中的其他在线主节点会注意到这一点，并对已下线的主节点进行故障转移</p>
+<p>集群进行故障转移的方法和Redis Sentinel进行故障转移的方法基本一样，不同的是，在集群里面，故障转移是由集群中其他在线的主节点负责进行的，所以集群不必另外使用Redis Sentinel</p>
+<p>由于Redis集群无中心节点，请求会发给任意主节点，主节点只会处理自己负责槽位的命令请求，其它槽位的命令请求，该主节点会返回客户端一个转向错误，客户端根据错误中包含的地址和端口重新向正确的负责的主节点发起命令请求</p>
+<h3 id="总结">总结</h3>
+<p>如果需要完整地分片、复制和高可用特性，并且要避免使用代理带来的性能瓶颈和资源消耗，那么可以选择使用Redis集群；如果只需要一部分特性（比如只需要分片，但不需要复制和高可用等），那么单独选用twemproxy、Redis的复制和Redis Sentinel中的一个或多个</p>
+<h1 id="数据模型">数据模型</h1>
+<p><img src="/images/image-20200312221055264.png" alt="image-20200312221055264"></p>
+<p>Redis key 值是二进制安全的，这意味着可以用任何二进制序列作为key值，从形如”foo”的简单字符串到一个JPEG文件的内容都可以。空字符串也是有效key值</p>
+<p>##　Key取值原则</p>
+<p>键值不需要太长，消耗内存，且在数据中查找这类键值的计算成本较高，键值不宜过短，可读性较差</p>
+<h2 id="命令">命令</h2>
+<h3 id="过期">过期</h3>
+<p>Redis中可以给Key设置一个生存时间（秒或毫秒），当达到这个时长后，这些键值将会被自动删除</p>
+<pre><code>// 设置多少秒或者毫秒后过期
+EXPIRE key seconds
+get key 
+set key val  ex 10
+PEXPIRE key milliseconds
+
+// 设置在指定Unix时间戳过期
+EXPIREAT key timestamp
+PEXPIREAT key milliseconds-timestamp
+
+// 删除过期
+PERSIST key
+
+// 生存时间
+// Time To Live，Key的剩余生存时间
+// 查看剩余生存时间， key存在但没有设置TTL，返回-1， key存在，但还在生存期内，返回剩余的秒或者毫秒，key曾经存在，但已经消亡，返回-2（2.8版本之前返回-1）
+TTL key
+PTTL key
+
+// 例
+set se abc ex 15
+ttl s6
+expire s6 60
+pttl s6
+persist s6
+pttl s6
+
+EXPIREAT cache 1355292000
+PEXPIREAT mykey 1555555555005
+
+</code></pre><h3 id="查找">查找</h3>
+<pre><code>查找键
+KEYS pattern
+
+pattern取值
+* 任意长度字符
+? 任意一个字符
+[] 字符集合，表示可以是集合中的任意一个
+
+keys s*
+keys s?
+keys s[13]
+keys *
+keys ??
+</code></pre><h3 id="类型和数据结构类型">类型和数据结构类型</h3>
+<pre><code>object encoding key   &gt; val 底层存储的数据结构类型
+
+键类型
+TYPE key   
+object encoding key
+	key:  
+		v:(K1)  
+		type:string   
+		enco..(raw/int)  
+		strlen:2
+		指针 value地址 
+</code></pre><h3 id="range">range</h3>
+<pre><code>获取子字符串   索引
+GETRANGE key start end
+0 3
+索引值从0开始，负数表示从字符串右边向左数起，-1表示最有一个字符
+01234
+1a2a3a
+-5 -4 -3 -2 -1
+覆盖字符串
+SETRANGE key offset value
+// 例子
+APPEND s6 123
+getrange s1 1 2
+getrange s1 0 -1
+getrange s1 -2 -1
+getrange s1 0 10000
+SETRANGE s6 3 e
+SETRANGE s6 3 efghijk
+SETRANGE newkey 5 hello
+SETRANGE s6 3 efghijk
+
+</code></pre><h3 id="incre--decre">incre &amp; decre</h3>
+<pre><code>步长1的增减
+INCR key
+DECR key
+字符串值会被解释成64位有符号的十进制整数来操作，结果依然转成字符串
+步长增减   float
+INCRBY key decrement
+DECRBY key decrement  
+字符串值会被解释成64位有符号的十进制整数来操作，结果依然转成字符串
+
+</code></pre><h3 id="其他">其他</h3>
+<pre><code>encoding,strlen:增删改:更新    查询长度,还是数值计算,成本很高
+键是否存在
+EXISTS key
+键重命名
+RENAME key newkey
+RENAMENX key newkey
+键删除
+DEL key [key ...]
+追加字符串
+APPEND key value
+如果键存在就追加；如果不存在就等同于SET key value
+</code></pre><h2 id="string">String</h2>
+<p>字符串是一种最基本的Redis值类型。Redis字符串是二进制安全的，这意味着一个Redis字符串能包含任意类型的数据。例如： 一张JPEG格式的图片或者一个序列化的Ruby对象</p>
+<p>一个字符串类型的值最多能存储512M字节的内容</p>
+<pre><code>设置字符串值  set  get
+SET key value [EX seconds] [PX milliseconds] [NX|XX]
+EX 设置过期时间，秒，等同于SETEX key seconds value
+PX 设置过期时间，毫秒，等同于PSETEX key milliseconds value
+NX 键不存在，才能设置，等同于SETNX key value
+XX 键存在时，才能设置
+
+// 设置多个键的字符串值
+MSET key value [key value ...]  
+// 键不存在时，设置字符串值 注意：这是原子操作
+MSETNX key value [key value ...]
+
+//例:
+set s1 abc
+set s2 12
+set se abc ex 15
+mset s3 3 s4 4 s5 5
+msetnx s5 A5 s6 6
+
+过期
+Redis中可以给Key设置一个生存时间（秒或毫秒），当达到这个时长后，这些键值将会被自动删除
+设置多少秒或者毫秒后过期
+EXPIRE key seconds
+get key 
+set key val  ex 10
+PEXPIRE key milliseconds
+设置在指定Unix时间戳过期
+EXPIREAT key timestamp
+PEXPIREAT key milliseconds-timestamp
+删除过期
+PERSIST key
+</code></pre><h2 id="位图bitmap">位图bitmap</h2>
+<pre><code>位图不是真正的数据类型，它是定义在字符串类型中,一个字符串类型的值最多能存储512M字节的内容
+位上限：2^(9+10+10+3)=2^32b
+</code></pre><h3 id="命令-1">命令</h3>
+<pre><code>// 设置某一位上的值
+SETBIT key offset value   （0/1）
+offset偏移量，从0开始
+// 获取某一位上的值
+GETBIT key offset
+// 返回指定值0或者1在指定区间上第一次出现的位置偏移量
+BITPOS key bit [start] [end]
+bitpos k1  1  1 1
+k2:    0  1  0  0  0  0  1  0        0  1  0  0  0  0  0  0 
+k3:    0  1  0  0  0  0  1  0    
+0 1 0 1 0 0 0 1 0 1 0 0 0 0 1 0
+setbit  k1  1  1
+
+</code></pre><h3 id="操作">操作</h3>
+<pre><code>对一个或多个保存二进制位的字符串 key 进行位元操作，并将结果保存到 destkey 上
+operation 可以是 AND 、 OR 、 NOT 、 XOR 这四种操作中的任意一种
+BITOP AND destkey key [key ...] ，对一个或多个 key 求逻辑并，并将结果保存到 destkey
+BITOP OR destkey key [key ...] ，对一个或多个 key 求逻辑或，并将结果保存到 destkey
+BITOP XOR destkey key [key ...] ，对一个或多个 key 求逻辑异或，并将结果保存到 destkey
+BITOP NOT destkey key ，对给定 key 求逻辑非，并将结果保存到 destkey
+除了 NOT 操作之外，其他操作都可以接受一个或多个 key 作为输入
+当 BITOP 处理不同长度的字符串时，较短的那个字符串所缺少的部分会被看作 0
+空的 key 也被看作是包含 0 的字符串序列
+思考：a位或b是什么？ 
+
+
+//  统计指定位区间上值为1的个数    字节
+bitpos key  bit（0/1）  start end   &gt; start end  bit位的索引
+BITCOUNT key [start] [end] &gt; start end  Byte位的索引  正负方向
+set k ab   bitcount k 1 1 
+//  从左向右从0开始，从右向左从-1开始，注意官方start、end是位，测试后是字节
+BITCOUNT testkey 0 0表示从索引为0个字节到索引为0个字节，就是第一个字节的统计
+BITCOUNT testkey 0  -1等同于BITCOUNT testkey
+最常用的就是 BITCOUNT testkey
+
+</code></pre><h2 id="list">List</h2>
+<ul>
+<li>
+<p>基于Linked List实现</p>
+</li>
+<li>
+<p>元素是字符串类型</p>
+</li>
+<li>
+<p>列表头尾增删快，中间增删慢，增删元素是常态</p>
+</li>
+<li>
+<p>元素可以重复出现</p>
+</li>
+<li>
+<p>最多包含2^32-1元素</p>
+<p><img src="/images/image-20200312223453370.png" alt="image-20200312223453370"></p>
+</li>
+</ul>
+<h3 id="使用">使用</h3>
+<ul>
+<li>
+<p>队列：L/R R/L</p>
+</li>
+<li>
+<p>栈: L/L  R/R</p>
+</li>
+<li>
+<p>数组:LINDEX LSET</p>
+</li>
+<li>
+<p>阻塞:BL BR</p>
+</li>
+</ul>
+<h3 id="命令-2">命令</h3>
+<pre><code>命令说明
+B block 阻塞
+L left 左
+R right 右
+X exist 存在
+
+左右或者头尾压入元素 string  set key “abc”
+LPUSH key value [value ...]
+LPUSHX key value
+RPUSH key value [value ...]
+PUSHX key value
+
+左右或者头尾弹出元素
+LPOP key
+RPOP key
+
+从一个列表尾部弹出元素压入到另一个列表的头部 string  getset
+RPOPLPUSH source destination
+
+返回列表中指定范围元素
+LRANGE key start stop
+LRANGE key 0 -1 表示返回所有元素
+
+获取指定位置的元素
+LINDEX key index
+
+设置指定位置元素的值
+LSET key index value
+
+列表长度，元素个数   string    strlen
+LLEN key      LRANGE KEY 0 -1
+
+从列表头部开始删除值等于value的元素count次,LIST 可以重复出现
+LREM key count value
+count &gt; 0 : 从表头开始向表尾搜索，移除与 value 相等的元素，数量为 count
+count &lt; 0 : 从表尾开始向表头搜索，移除与 value 相等的元素，数量为 count 的绝对值
+count = 0 : 移除表中所有与 value 相等的值
+
+举例
+RPUSH listkey c abc c ab 123 ab bj ab redis list
+LREM listkey 2 ab
+LRANGE listkey 0 -1
+
+
+去除指定范围 外 元素
+LTRIM key start stop
+
+举例
+RPUSH listkey c abc c ab 123 ab bj ab redis list
+LTRIM listkey 0 -1
+LTRIM listkey 1 -1
+LTRIM listkey 1 10000
+
+微博的评论最后500条
+LTRIM u1234:forumid:comments 0 499
+
+在列表中某个存在的值（pivot）前或后插入元素
+LINSERT key BEFORE|AFTER pivot value
+key和pivot不存在，不进行任何操作
+
+举例
+RPUSH lst Clojure C Lua
+LINSERT lst AFTER  C Python
+LINSERT lst BEFORE C Ruby
+
+阻塞
+如果弹出的列表不存在或者为空，就会阻塞
+超时时间设置为0，就是永久阻塞，直到有数据可以弹出
+如果多个客户端阻塞在同一个列表上，使用First In First Service原则，先到先服务
+左右或者头尾阻塞弹出元素
+BLPOP key [key ...] timeout
+BRPOP key [key ...] timeout
+从一个列表尾部阻塞弹出元素压入到另一个列表的头部
+BRPOPLPUSH source destination timeout
+</code></pre><h2 id="map">Map</h2>
+<ul>
+<li>
+<p>由field和关联的value组成的map键值对</p>
+</li>
+<li>
+<p>field和value是字符串类型</p>
+</li>
+<li>
+<p>一个hash中最多包含2^32-1键值对</p>
+</li>
+</ul>
+<h3 id="命令-3">命令</h3>
+<pre><code>设置单个字段
+HSET key field value
+HSETNX key field value
+
+key的filed不存在的情况下执行，key不存在直接创建
+
+设置多个字段
+HMSET key field value [field value ...]
+
+返回字段个数
+HLEN key
+
+判断字段是否存在，key或者field不存在，返回0
+HEXISTS key field
+
+返回字段值
+HGET key field
+
+返回多个字段值
+HMGET key field [field ...]
+
+返回所有的键值对
+HGETALL key
+
+返回所有字段名
+HKEYS key
+
+返回所有值
+HVALS key
+
+在字段对应的值上进行整数的增量计算
+HINCRBY key field increment
+
+在字段对应的值上进行浮点数的增量计算
+HINCRBYFLOAT key field increment
+
+删除指定的字段
+HDEL key field [field ...]
+
+举例
+HINCRBY numbers x 100
+HINCRBY numbers x -50
+HINCRBYFLOAT numbers x 3.14
+HDEL numbers x
+
+</code></pre><h3 id="意义节约内存空间">意义—节约内存空间</h3>
+<p>每创建一个键，它都会为这个键储存一些附加的管理信息（比如这个键的类型，这个键最后一次被访问的时间等等），所以数据库里面的键越多，redis数据库服务器在储存附加管理信息方面耗费的内存就越多，花在管理数据库键上的CPU也会越多在字段对应的值上进行浮点数的增量计算。</p>
+<p><img src="/images/image-20200312224336457.png" alt="image-20200312224336457"></p>
+<h3 id="不适合hash的情况">不适合hash的情况</h3>
+<p>使用二进制位操作命令：因为Redis目前支持对字符串键进行SETBIT、GETBIT、BITOP等操作，如果你想使用这些操作，那么只能使用字符串键，虽然散列也能保存二进制数据</p>
+<p>使用过期键功能：Redis的键过期功能目前只能对键进行过期操作，而不能对散列的字段进行过期操作，因此如果你要对键值对数据使用过期功能的话，那么只能把键值对储存在字符串里面</p>
+<h2 id="set集合-抽样集合">Set集合 （抽样，集合）</h2>
+<ul>
+<li>
+<p>无序的、去重的</p>
+</li>
+<li>
+<p>元素是字符串类型</p>
+</li>
+<li>
+<p>最多包含 2^32-1元素</p>
+</li>
+</ul>
+<p><img src="/images/image-20200312224553895.png" alt="image-20200312224553895"></p>
+<h3 id="命令-4">命令</h3>
+<pre><code>增加一个或多个元素 如果元素已经存在，则自动忽略
+SADD key member [member ...]
+
+举例
+SADD friends peter
+SADD friends jack tom john
+SADD friends may tom
+
+移除一个或者多个元素 元素不存在，自动忽略
+SREM key member [member ...]
+
+举例
+SREM friends peter
+SREM friends tom john
+
+返回集合包含的所有元素
+SMEMBERS key
+
+如果集合元素过多，例如百万个，需要遍历，可能会造成服务器阻塞，生产环境应避免使用
+检查给定元素是否存在于集合中
+SISMEMBER key member
+
+集合的无序性
+SADD friendsnew &quot;peter&quot; &quot;jack&quot; &quot;tom&quot; &quot;john&quot; &quot;may&quot; &quot;ben&quot;
+SADD anotherfriends &quot;peter&quot; &quot;jack&quot; &quot;tom&quot; &quot;john&quot; &quot;may&quot; &quot;ben&quot;
+SMEMBERS friends
+SMEMBERS anotherfriends
+
+注意， SMEMBERS 有可能返回不同的结果，所以，如果需要存储有序且不重复的数据使用有序集合，存储有序可重复的使用列表
+
+抽样 随机返回集合中指定个数的
+SRANDMEMBER key [count]
+如果 count 为正数，且小于集合基数，那么命令返回一个包含 count 个元素的数组，数组中的元素各不相同。如果 count 大于等于集合基数，那么返回整个集合  最多返回整个集合 conut&gt;=0
+如果 count 为负数，那么命令返回一个数组，数组中的元素可能会重复出现多次，而数组的长度为 count 的绝对值  count &lt; 0   长度为count绝对值，元素可能重复
+如果 count 为 0，返回空
+如果 count 不指定，随机返回一个元素
+举例
+SADD friend &quot;peter&quot; &quot;jack&quot; &quot;tom&quot; &quot;john&quot; &quot;may&quot; &quot;ben&quot;
+SRANDMEMBER friends 3
+SRANDMEMBER friends -5
+
+返回集合中元素的个数
+SCARD key
+键的结果会保存信息，集合长度就记录在里面，所以不需要遍历
+随机从集合中移除并返回这个被移除的元素
+SPOP key
+把元素从源集合移动到目标集合
+SMOVE source destination member
+
+
+差集
+SDIFF key [key ...]，从第一个key的集合中去除其他集合和自己的交集部分
+SDIFFSTORE destination key [key ...]，将差集结果存储在目标key中
+举例
+SADD number1 123 456 789
+SADD number2 123 456 999
+SDIFF number1 number2
+
+
+交集
+SINTER key [key ...]，取所有集合交集部分
+SINTERSTORE destination key [key ...]，将交集结果存储在目标key中
+
+举例
+SADD number1 123 456 789
+SADD number2 123 456 999
+SINTER number1 number2
+
+并集
+SUNION key [key ...]，取所有集合并集
+SUNIONSTORE destination key [key ...]，将并集结果存储在目标key中
+举例
+SADD number1 123 456 789
+SADD number2 123 456 999
+SUNION number1 number2
+
+
+
+</code></pre><h2 id="sortedset有序集合">SortedSet有序集合</h2>
+<ul>
+<li>
+<p>类似Set集合</p>
+</li>
+<li>
+<p>有序的、去重的</p>
+</li>
+<li>
+<p>元素是字符串类型</p>
+</li>
+<li>
+<p>每一个元素都关联着一个浮点数分值（Score），并按照分值从小到大的顺序排列集合中的元素。分值可以相同</p>
+</li>
+<li>
+<p>最多包含2^32-1元素</p>
+</li>
+</ul>
+<p>一个保存了水果价格的有序集合</p>
+<p><img src="/images/image-20200312225034751.png" alt="image-20200312225034751"></p>
+<p>一个保存了员工薪水的有序集合</p>
+<p><img src="/images/image-20200312225039159.png" alt="image-20200312225039159"></p>
+<p>一个有序集合，保存了正在阅读某些技术书的人数</p>
+<p><img src="/images/image-20200312225043083.png" alt="image-20200312225043083"></p>
+<h3 id="命令-5">命令</h3>
+<pre><code>增加一个或多个元素 如果元素已经存在，则使用新的score
+ZADD key score member [score member ...]
+
+
+举例
+ZADD fruits 3.2 香蕉
+ZADD fruits 2.0 西瓜
+ZADD fruits 4.0 番石榴 7.0 梨 6.8 芒果
+
+
+移除一个或者多个元素，元素不存在，自动忽略
+ZREM key member [member ...]
+
+举例
+ZREM fruits 番石榴 梨 芒果
+ZREM fruits 西瓜
+
+显示分值
+ZSCORE key member
+
+举例
+ZSCORE fruits 芒果
+ZSCORE fruits 西瓜
+
+增加或者减少分值
+ZINCRBY key increment member
+increment为负数就是减少
+
+举例
+ZINCRBY fruits 1.5 西瓜
+ZINCRBY fruits -0.8 香蕉
+
+返回元素的排名（索引）
+ZRANK key member
+
+举例
+ZRANK fruits 西瓜
+ZRANK fruits 番石榴
+ZRANK fruits 芒果
+
+返回元素的逆序排名
+ZREVRANK key member
+
+举例
+ZREVRANK fruits 西瓜
+ZREVRANK fruits 番石榴
+ZREVRANK fruits 芒果
+
+返回指定索引区间元素
+ZRANGE key start stop [WITHSCORES]
+如果score相同，则按照字典序lexicographical order 排列
+默认按照score从小到大，如果需要score从大到小排列，使用ZREVRANGE
+
+举例
+ZRANGE fruits 0 2
+ZRANGE fruits -5 -4
+
+返回指定分值区间元素
+ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+返回score默认属于[min,max]之间，元素按照score升序排列，score相同字典序
+LIMIT中offset代表跳过多少个元素，count是返回几个。类似于Mysql
+使用小括号，修改区间为开区间，例如(5、(10、5)
+-inf和+inf表示负无穷和正无穷
+
+举例
+ZRANGEBYSCORE fruits 4.0 7.0
+ZRANGEBYSCORE fruits (4 7
+ZRANGEBYSCORE fruits -inf +inf
+
+移除指定排名范围的元素
+ZREMRANGEBYRANK key start stop
+
+举例
+ZREMRANGEBYRANK fruits 0 2
+ZRANGE fruits 0 -1
+
+
+并集
+ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight] [AGGREGATE SUM|MIN|MAX]
+numkeys指定key的数量，必须
+WEIGHTS选项，与前面设定的key对应，对应key中每一个score都要乘以这个权重
+AGGREGATE选项，指定并集结果的聚合方式
+SUM：将所有集合中某一个元素的score值之和作为结果集中该成员的score值
+MIN：将所有集合中某一个元素的score值中最小值作为结果集中该成员的score值
+MAX：将所有集合中某一个元素的score值中最大值作为结果集中该成员的score值
+
+举例
+ZADD scores1 70 tom 80 peter 60 john
+ZADD scores2 90 peter 60 ben
+ZUNIONSTORE scores-all 2 scores1 scores2
+ZUNIONSTORE scores-all1 2 scores1 scores2 AGGREGATE SUM
+ZUNIONSTORE scores-all2 2 scores1 scores2 WEIGHTS 1 0.5 AGGREGATE SUM
+
+交集
+ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight] [AGGREGATE SUM|MIN|MAX]
+numkeys指定key的数量，必须
+WEIGHTS选项，与前面设定的key对应，对应key中每一个score都要乘以这个权重
+AGGREGATE选项，指定并集结果的聚合方式
+SUM：将所有集合中某一个元素的score值之和作为结果集中该成员的score值
+MIN：将所有集合中某一个元素的score值中最小值作为结果集中该成员的score值
+MAX：将所有集合中某一个元素的score值中最大值作为结果集中该成员的score值
+
+</code></pre>
+  </section>
+
+  <section>
+    
+      
+    
+  </section>
+</article>
+
+      </div>
+
+      <div id="side" class="pr-1 bg-white">
+        <aside class="pr-3">
+          
+  
+    <div id="toc" class="Box Box--blue mb-3">
+      <b>Redis 入门级</b><nav id="TableOfContents">
+  <ul>
+    <li><a href="#启动">启动</a></li>
+  </ul>
+
+  <ul>
+    <li><a href="#redis持久化方式">Redis持久化方式</a></li>
+    <li><a href="#rdb">RDB</a>
+      <ul>
+        <li><a href="#被动-默认使用的方式">被动 (默认使用的方式)</a></li>
+        <li><a href="#对比-save--bgsave">对比 save &amp; bgsave</a></li>
+        <li><a href="#rdb优点">RDB优点</a></li>
+        <li><a href="#rdb缺点">RDB缺点</a></li>
+      </ul>
+    </li>
+    <li><a href="#aof记录命令">AOF（记录命令）</a>
+      <ul>
+        <li><a href="#aof写入机制">AOF写入机制</a></li>
+        <li><a href="#写入磁盘的策略">写入磁盘的策略</a></li>
+        <li><a href="#aof重写机制">AOF重写机制</a></li>
+        <li><a href="#aof重写触发">AOF重写触发</a></li>
+        <li><a href="#优点">优点</a></li>
+        <li><a href="#缺点">缺点</a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <ul>
+    <li><a href="#主从复制横向扩充">主从复制（横向扩充）</a>
+      <ul>
+        <li><a href="#配置">配置</a></li>
+        <li><a href="#缺点-1">缺点</a></li>
+      </ul>
+    </li>
+    <li><a href="#哨兵sentinel">哨兵（Sentinel）</a>
+      <ul>
+        <li><a href="#配置-1">配置</a></li>
+        <li><a href="#优缺点">优缺点</a></li>
+      </ul>
+    </li>
+    <li><a href="#redis集群30">Redis集群（3.0）</a>
+      <ul>
+        <li><a href="#redis集群分片">Redis集群分片</a></li>
+        <li><a href="#master多">Master（多）</a></li>
+        <li><a href="#slave多">Slave（多）</a></li>
+        <li><a href="#总结">总结</a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <ul>
+    <li><a href="#命令">命令</a>
+      <ul>
+        <li><a href="#过期">过期</a></li>
+        <li><a href="#查找">查找</a></li>
+        <li><a href="#类型和数据结构类型">类型和数据结构类型</a></li>
+        <li><a href="#range">range</a></li>
+        <li><a href="#incre--decre">incre &amp; decre</a></li>
+        <li><a href="#其他">其他</a></li>
+      </ul>
+    </li>
+    <li><a href="#string">String</a></li>
+    <li><a href="#位图bitmap">位图bitmap</a>
+      <ul>
+        <li><a href="#命令-1">命令</a></li>
+        <li><a href="#操作">操作</a></li>
+      </ul>
+    </li>
+    <li><a href="#list">List</a>
+      <ul>
+        <li><a href="#使用">使用</a></li>
+        <li><a href="#命令-2">命令</a></li>
+      </ul>
+    </li>
+    <li><a href="#map">Map</a>
+      <ul>
+        <li><a href="#命令-3">命令</a></li>
+        <li><a href="#意义节约内存空间">意义—节约内存空间</a></li>
+        <li><a href="#不适合hash的情况">不适合hash的情况</a></li>
+      </ul>
+    </li>
+    <li><a href="#set集合-抽样集合">Set集合 （抽样，集合）</a>
+      <ul>
+        <li><a href="#命令-4">命令</a></li>
+      </ul>
+    </li>
+    <li><a href="#sortedset有序集合">SortedSet有序集合</a>
+      <ul>
+        <li><a href="#命令-5">命令</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav></div>
+  
+
+  
+    <div>
+      
+    </div>
+  
+
+        </aside>
+      </div>
+
+      <div id="footer" class="pt-2 pb-3 bg-white text-center">
+        
+
+  <span class="text-small text-gray">
+    
+
+    Powered by the
+    <a href="https://github.com/qqhann/hugo-primer" class="link-gray-dark">Hugo-Primer</a> theme for
+    <a href="https://gohugo.io" class="link-gray-dark">Hugo</a>.
+  </span>
+
+
+      </div>
+    </div>
+
+    
+    
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/x-mathjax-config">MathJax.Hub.Config({ tex2jax: { inlineMath: [['$','$'], ['\\(','\\)']] } });</script>
+    
+  </body>
+</html>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>mysql on chouc</title>
+    <link>http://localhost:1313/tags/mysql/</link>
+    <description>Recent content in mysql on chouc</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <lastBuildDate>Tue, 05 Mar 2019 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="http://localhost:1313/tags/mysql/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Mysql 索引</title>
+      <link>http://localhost:1313/sql-%E9%A2%84%E7%83%AD/</link>
+      <pubDate>Tue, 05 Mar 2019 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/sql-%E9%A2%84%E7%83%AD/</guid>
+      <description>SQL 预热 1. 常见的 Join 查询图 索引优化分析 1. 索引的概念 1.1 是什么 MySQL 官方对索引的定义为：索引（Index）是帮助 MySQL 高效获取数据的数据结构。可以得到索引的</description>
+    </item>
+    
+  </channel>
+</rss>

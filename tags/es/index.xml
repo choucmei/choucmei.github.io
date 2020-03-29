@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>ES on chouc</title>
+    <link>http://localhost:1313/tags/es/</link>
+    <description>Recent content in ES on chouc</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <lastBuildDate>Tue, 05 Mar 2019 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="http://localhost:1313/tags/es/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>ElasticSearch 入门级</title>
+      <link>http://localhost:1313/es/</link>
+      <pubDate>Tue, 05 Mar 2019 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/es/</guid>
+      <description>Elasticsearch是一个基于Apache Lucene(TM)的开源搜索引擎。无论在开源还是专有领域，Lucene可以被认为是迄今为止</description>
+    </item>
+    
+  </channel>
+</rss>

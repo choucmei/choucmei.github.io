@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>多线程 on chouc</title>
+    <link>http://localhost:1313/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/</link>
+    <description>Recent content in 多线程 on chouc</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <lastBuildDate>Tue, 05 Mar 2019 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="http://localhost:1313/tags/%E5%A4%9A%E7%BA%BF%E7%A8%8B/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Synchronize 总结</title>
+      <link>http://localhost:1313/%E5%A4%9A%E7%BA%BF%E7%A8%8B%E6%80%BB%E7%BB%93/</link>
+      <pubDate>Tue, 05 Mar 2019 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/%E5%A4%9A%E7%BA%BF%E7%A8%8B%E6%80%BB%E7%BB%93/</guid>
+      <description>Synchronize 总结 原理 通过获取底层的对象或者类的 monitor 权限，拥有monitor 权的线程拥有执行权。 monitor 本质又是通过操作系统底层的 Mutex Lock 来实现。 通过 javap -c 可以看到 sync</description>
+    </item>
+    
+  </channel>
+</rss>

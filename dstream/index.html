@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    
+    
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-12345678-0', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+    
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+      
+  Spark DStream的源码和原理 &ndash; chouc
+
+    </title>
+    
+    
+    <meta name="description" property="og:description" content="Synchronize|chouc&#39;s blog">
+    
+
+    <meta name="apple-mobile-web-app-title" content="chouc">
+    
+    
+    
+    
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:site" content="@">
+    <meta name="twitter:creator" content="@">
+    <meta name="twitter:title" content="Spark DStream的源码和原理 | chouc">
+    <meta name="twitter:description" content="Synchronize|chouc&#39;s blog">
+    <meta name="twitter:image" content="http://localhost:1313/twitter-card.png">
+    
+
+
+    <link rel="stylesheet" href="/assets/syntax.css">
+    <link rel="stylesheet" href="/assets/primer-build.css">
+    <link rel="stylesheet" href="/assets/style.css">
+  </head>
+
+
+  <body class="bg-gray">
+    <div id="holy" class="container-lg bg-white h-100">
+
+      <div id="header" class="px-1 bg-white">
+        <nav class="UnderlineNav UnderlineNav--right px-2">
+  <a class="UnderlineNav-actions muted-link h2" href="http://localhost:1313/">
+    chouc
+  </a>
+
+  
+  
+  <div class="UnderlineNav-body">
+    
+    
+    
+    <a class="UnderlineNav-item " href="/">
+      
+      <span>Blog</span>
+    </a>
+    
+    
+    
+    
+    <a class="UnderlineNav-item " href="/about/">
+      
+      <span>About</span>
+    </a>
+    
+    
+  </div>
+  
+</nav>
+
+      </div>
+
+      <div role="main" id="main" class="holy-main markdown-body px-4 bg-white">
+        
+
+<div class="Subhead">
+  <div class="Subhead-heading">
+    <div class="h1 mt-3 mb-1">Spark DStream的源码和原理</div>
+  </div>
+  <div class="Subhead-description">
+    
+
+
+<a href='/categories/bigdata' class="muted-link">
+  <span class="Label Label--gray-darker">Bigdata</span>
+</a>
+
+
+
+<a href='/tags/spark' class="muted-link">
+  <span class="Label Label--gray">Spark</span>
+</a>
+
+
+    
+    <div class="float-md-right">
+      <span title="Lastmod: 2019-03-05. Published at: 2019-03-05.">
+        
+          Published: 2019-03-05
+        
+      </span>
+    </div>
+    
+  </div>
+</div>
+<article>
+  
+  <section class="pb-6 mb-3 border-bottom">
+    <p>众所周知 Spark Streaming是核心Spark API的扩展，可实现实时数据流的可伸缩，高吞吐量，容错流处理。可以从许多数据源（例如Kafka，Flume，Kinesis或TCP套接字）中提取数据，并可以使用以高级功能（如map，reduce，join和window）表示的复杂算法来处理数据。最后，可以将处理后的数据推送到文件系统，数据库和实时仪表板。实际上，您可以在数据流上应用Spark的机器学习和图形处理算法。</p>
+<h2 id="demo">Demo</h2>
+<pre><code>object KafkaDirectDstream {
+  def main(args: Array[String]): Unit = {
+    val sparkConf = new SparkConf().setAppName(&quot;KafkaDirectDstream&quot;)
+    sparkConf.setMaster(&quot;local[*]&quot;)
+    sparkConf.set(&quot;spark.streaming.kafka.maxRatePerPartition&quot;, &quot;1&quot;)
+    sparkConf.set(&quot;spark.serializer&quot;, &quot;org.apache.spark.serializer.KryoSerializer&quot;)
+    val streamingContext = new StreamingContext(sparkConf, Seconds(2))
+    val kafkaParams = Map[String, Object](
+      &quot;bootstrap.servers&quot; -&gt; &quot;s1:9092&quot;,
+      &quot;key.deserializer&quot; -&gt; classOf[StringDeserializer],
+      &quot;value.deserializer&quot; -&gt; classOf[StringDeserializer],
+      &quot;group.id&quot; -&gt; &quot;p1&quot;,
+      &quot;auto.offset.reset&quot; -&gt; &quot;earliest&quot;,
+      &quot;enable.auto.commit&quot; -&gt; (false: java.lang.Boolean)
+    )
+    val topics = Array(&quot;test_topic&quot;)
+   
+    val dstream = KafkaUtils.createDirectStream[String, String](
+      streamingContext,
+      PreferConsistent,
+      Subscribe[String, String](topics, kafkaParams)
+    )
+
+    dstream.map(record =&gt; (record.key, record.value, record.partition(), record.offset()))
+      .foreachRDD(rdd =&gt; {
+ 			....
+        })
+
+      })
+    streamingContext.start()
+    streamingContext.awaitTermination()
+  }
+}
+</code></pre><h2 id="spark-源码分析">Spark 源码分析</h2>
+<h3 id="streamingcontext">StreamingContext</h3>
+<p>整个Dstream 类似RDD &ldquo;懒加载&rdquo; ，出发点就是  streamingContext.start()。</p>
+<p>为了方便查看，我去掉了一些其他代码，只保留关键逻辑代码</p>
+<pre><code>def start(): Unit = synchronized {
+  state match {
+    case INITIALIZED =&gt;
+      StreamingContext.ACTIVATION_LOCK.synchronized {
+        try {
+          validate()
+
+          // 最关键的地方 new 了一个线程去启动 scheduler
+          ThreadUtils.runInNewThread(&quot;streaming-start&quot;) {
+            sparkContext.setCallSite(startSite.get)
+            sparkContext.clearJobGroup()
+            sparkContext.setLocalProperty(SparkContext.SPARK_JOB_INTERRUPT_ON_CANCEL, &quot;false&quot;)
+            savedProperties.set(SerializationUtils.clone(sparkContext.localProperties.get()))
+            // 
+            scheduler.start()
+          }
+          state = StreamingContextState.ACTIVE
+          scheduler.listenerBus.post(
+            StreamingListenerStreamingStarted(System.currentTimeMillis()))
+        } catch {
+          
+        }
+        StreamingContext.setActiveContext(this)
+      }
+  }
+}
+</code></pre><h3 id="jobscheduler">JobScheduler</h3>
+<p>点开 scheduler.start() 就是  JobScheduler</p>
+<pre><code>def start(): Unit = synchronized {
+  if (eventLoop != null) return // scheduler has already been started
+
+  logDebug(&quot;Starting JobScheduler&quot;)
+  
+  // EventLoop底层就是一个简单的 BlockQueue 实现的消息接受和通知调度器，
+  // 因为本身这些代码在Driver运行，所以不涉及到跨节点，所以也不涉及netty通信等
+  eventLoop = new EventLoop[JobSchedulerEvent](&quot;JobScheduler&quot;) {
+    override protected def onReceive(event: JobSchedulerEvent): Unit = processEvent(event)
+
+    override protected def onError(e: Throwable): Unit = reportError(&quot;Error in job scheduler&quot;, e)
+  }
+  // 关键  启动 事件调度，上面实现了 EventLoop 的抽象方法（有任务开始、任务完成、ERROR三个事件）
+  eventLoop.start()
+
+  // attach rate controllers of input streams to receive batch completion updates
+  for {
+    inputDStream &lt;- ssc.graph.getInputStreams
+    rateController &lt;- inputDStream.rateController
+  } ssc.addStreamingListener(rateController)
+
+  listenerBus.start()
+  receiverTracker = new ReceiverTracker(ssc)
+  inputInfoTracker = new InputInfoTracker(ssc)
+
+  val executorAllocClient: ExecutorAllocationClient = ssc.sparkContext.schedulerBackend match {
+    case b: ExecutorAllocationClient =&gt; b.asInstanceOf[ExecutorAllocationClient]
+    case _ =&gt; null
+  }
+
+  executorAllocationManager = ExecutorAllocationManager.createIfEnabled(
+    executorAllocClient,
+    receiverTracker,
+    ssc.conf,
+    ssc.graph.batchDuration.milliseconds,
+    clock)
+  executorAllocationManager.foreach(ssc.addStreamingListener)
+  receiverTracker.start()
+  // 关键 开启产生job 的调度
+  jobGenerator.start()
+  executorAllocationManager.foreach(_.start())
+  logInfo(&quot;Started JobScheduler&quot;)
+}
+
+ private def processEvent(event: JobSchedulerEvent) {
+    try {
+      event match {
+        case JobStarted(job, startTime) =&gt; handleJobStart(job, startTime)
+        case JobCompleted(job, completedTime) =&gt; handleJobCompletion(job, completedTime)
+        case ErrorReported(m, e) =&gt; handleError(m, e)
+      }
+    } catch {
+      case e: Throwable =&gt;
+        reportError(&quot;Error in job scheduler&quot;, e)
+    }
+  }
+</code></pre><p>###　JobGenerator</p>
+<pre><code>def start(): Unit = synchronized {
+  if (eventLoop != null) return // generator has already been started
+
+  // Call checkpointWriter here to initialize it before eventLoop uses it to avoid a deadlock.
+  // See SPARK-10125
+  checkpointWriter
+　// 又是一个事件调度
+  eventLoop = new EventLoop[JobGeneratorEvent](&quot;JobGenerator&quot;) {
+    override protected def onReceive(event: JobGeneratorEvent): Unit = processEvent(event)
+
+    override protected def onError(e: Throwable): Unit = {
+      jobScheduler.reportError(&quot;Error in job generator&quot;, e)
+    }
+  }
+  eventLoop.start()
+
+  if (ssc.isCheckpointPresent) {
+    restart()
+  } else {
+    // 这边开启 产生批次的事件
+    startFirstTime()
+  }
+}
+
+//几个事件
+private def processEvent(event: JobGeneratorEvent) {
+    logDebug(&quot;Got event &quot; + event)
+    event match {
+      case GenerateJobs(time) =&gt; generateJobs(time)
+      case ClearMetadata(time) =&gt; clearMetadata(time)
+      case DoCheckpoint(time, clearCheckpointDataLater) =&gt;
+        doCheckpoint(time, clearCheckpointDataLater)
+      case ClearCheckpointData(time) =&gt; clearCheckpointData(time)
+    }
+  }
+// 我们关注主要流程 ，只需要关注产生 job
+private def generateJobs(time: Time) {
+    // Checkpoint all RDDs marked for checkpointing to ensure their lineages are
+    // truncated periodically. Otherwise, we may run into stack overflows (SPARK-6847).
+    ssc.sparkContext.setLocalProperty(RDD.CHECKPOINT_ALL_MARKED_ANCESTORS, &quot;true&quot;)
+    Try {
+      jobScheduler.receiverTracker.allocateBlocksToBatch(time) // allocate received blocks to batch
+      // 这边是通过Graph产生
+      graph.generateJobs(time) // generate jobs using allocated block
+    } match {
+      case Success(jobs) =&gt;
+        val streamIdToInputInfos = jobScheduler.inputInfoTracker.getInfo(time)
+        jobScheduler.submitJobSet(JobSet(time, jobs, streamIdToInputInfos))
+      case Failure(e) =&gt;
+        jobScheduler.reportError(&quot;Error generating jobs for time &quot; + time, e)
+        PythonDStream.stopStreamingContextIfPythonProcessIsDead(e)
+    }
+    eventLoop.post(DoCheckpoint(time, clearCheckpointDataLater = false))
+  }
+</code></pre><p>此外什么时候发送产生批次的事件呢</p>
+<p>ssc.graph.batchDuration.milliseconds 就是 new StreamContext的批次间隔时间 interval</p>
+<pre><code>private val timer = new RecurringTimer(clock, ssc.graph.batchDuration.milliseconds,
+  longTime =&gt; eventLoop.post(GenerateJobs(new Time(longTime))), &quot;JobGenerator&quot;)
+</code></pre><h3 id="recurringtimer">RecurringTimer</h3>
+<pre><code>开启线程
+def start(startTime: Long): Long = synchronized {
+  nextTime = startTime
+  thread.start()
+  logInfo(&quot;Started timer for &quot; + name + &quot; at time &quot; + nextTime)
+  nextTime
+}
+
+private val thread = new Thread(&quot;RecurringTimer - &quot; + name) {
+    setDaemon(true)
+    override def run() { loop }
+}
+
+
+ private def loop() {
+    try {
+      while (!stopped) {
+        triggerActionForNextInterval()
+      }
+      triggerActionForNextInterval()
+    } catch {
+      case e: InterruptedException =&gt;
+    }
+  }
+  
+  
+  private def triggerActionForNextInterval(): Unit = {
+    //这边就是阻塞 有两中 clock，第一种是 SystemClock 是Thread.sleep 
+    // 第二种是 ManualClock object.wait()
+    clock.waitTillTime(nextTime)
+    // 这个callback 就是   longTime =&gt; eventLoop.post(GenerateJobs(new Time(longTime)))
+    // 发送 GenerateJobs 事件
+    callback(nextTime)
+    prevTime = nextTime
+    nextTime += period
+    logDebug(&quot;Callback for &quot; + name + &quot; called at time &quot; + prevTime)
+  }
+
+</code></pre><h3 id="dstreamgraph">DStreamGraph</h3>
+<pre><code>//先找到 generateJobs 方法
+def generateJobs(time: Time): Seq[Job] = {
+  logDebug(&quot;Generating jobs for time &quot; + time)
+  val jobs = this.synchronized {
+    outputStreams.flatMap { outputStream =&gt;
+      val jobOption = outputStream.generateJob(time)
+      jobOption.foreach(_.setCallSite(outputStream.creationSite))
+      jobOption
+    }
+  }
+  logDebug(&quot;Generated &quot; + jobs.length + &quot; jobs for time &quot; + time)
+  jobs
+}
+
+
+// 定位到 outputStreams
+private val outputStreams = new ArrayBuffer[DStream[_]]()
+
+
+// 定位向这个list 加DStream的方法
+def addOutputStream(outputStream: DStream[_]) {
+    this.synchronized {
+      outputStream.setGraph(this)
+      outputStreams += outputStream
+    }
+  }
+
+</code></pre><h3 id="dstream">DStream</h3>
+<pre><code>private[streaming] def register(): DStream[T] = {
+  ssc.graph.addOutputStream(this)
+  this
+}
+
+//最后是在调用ForeachRDD的时候加入进去
+private def foreachRDD(
+      foreachFunc: (RDD[T], Time) =&gt; Unit,
+      displayInnerRDDOps: Boolean): Unit = {
+    new ForEachDStream(this,
+      context.sparkContext.clean(foreachFunc, false), displayInnerRDDOps).register()
+  }
+</code></pre><p>官网上提供的几个输出方法也就是 Action 也就是间接触发DStream job 的方法</p>
+<p><img src="/images/image-20200216175325662.png" alt="image-20200216175325662"></p>
+<p>这些方法都是调用了 foreachRDD 方法，也就是间接触发Action</p>
+<pre><code>def print(num: Int): Unit = ssc.withScope {
+  def foreachFunc: (RDD[T], Time) =&gt; Unit = {
+    (rdd: RDD[T], time: Time) =&gt; {
+      val firstNum = rdd.take(num + 1)
+      // scalastyle:off println
+      println(&quot;-------------------------------------------&quot;)
+      println(s&quot;Time: $time&quot;)
+      println(&quot;-------------------------------------------&quot;)
+      firstNum.take(num).foreach(println)
+      if (firstNum.length &gt; num) println(&quot;...&quot;)
+      println()
+      // scalastyle:on println
+    }
+  }
+  foreachRDD(context.sparkContext.clean(foreachFunc), displayInnerRDDOps = false)
+}
+
+def saveAsObjectFiles(prefix: String, suffix: String = &quot;&quot;): Unit = ssc.withScope {
+    val saveFunc = (rdd: RDD[T], time: Time) =&gt; {
+    val file = rddToFileName(prefix, suffix, time)
+    	rdd.saveAsObjectFile(file)
+    }
+    this.foreachRDD(saveFunc, displayInnerRDDOps = false)
+}
+</code></pre><h3 id="dstreamgraph-1">DStreamGraph</h3>
+<p>再回到 generateJobs 方法，遍历所有通过ForeachRDD 加入的DStream，调用 generateJob 方法</p>
+<pre><code>def generateJobs(time: Time): Seq[Job] = {
+  logDebug(&quot;Generating jobs for time &quot; + time)
+  val jobs = this.synchronized {
+    outputStreams.flatMap { outputStream =&gt;
+      val jobOption = outputStream.generateJob(time)
+      jobOption.foreach(_.setCallSite(outputStream.creationSite))
+      jobOption
+    }
+  }
+  logDebug(&quot;Generated &quot; + jobs.length + &quot; jobs for time &quot; + time)
+  jobs
+}
+</code></pre><h3 id="dstream-1">DStream</h3>
+<p>这边的最后调用 getOrCompute 得到RDD，其实getOrCompute 继承的DStream 重写，例如调用map方法。第一个Dstream 是重写 compute 方法，getOrCompute  调用 compute</p>
+<pre><code>private[streaming] def generateJob(time: Time): Option[Job] = {
+  getOrCompute(time) match {
+    case Some(rdd) =&gt;
+      val jobFunc = () =&gt; {
+        val emptyFunc = { (iterator: Iterator[T]) =&gt; {} }
+        // 最最最最关键的地方 这边就提交了这个批次产生的RDD 也就是开始RDD的流程
+        context.sparkContext.runJob(rdd, emptyFunc)
+      }
+      Some(new Job(time, jobFunc))
+    case None =&gt; None
+  }
+}
+
+private[streaming] final def getOrCompute(time: Time): Option[RDD[T]] = {
+    // If RDD was already generated, then retrieve it from HashMap,
+    // or else compute the RDD
+    generatedRDDs.get(time).orElse {
+      // Compute the RDD if time is valid (e.g. correct time in a sliding window)
+      // of RDD generation, else generate nothing.
+      if (isTimeValid(time)) {
+
+        val rddOption = createRDDWithLocalProperties(time, displayInnerRDDOps = false) {
+          // Disable checks for existing output directories in jobs launched by the streaming
+          // scheduler, since we may need to write output to an existing directory during checkpoint
+          // recovery; see SPARK-4835 for more details. We need to have this call here because
+          // compute() might cause Spark jobs to be launched.
+          SparkHadoopWriterUtils.disableOutputSpecValidation.withValue(true) {
+            // 关键方法
+            compute(time)
+          }
+        }
+
+        rddOption.foreach { case newRDD =&gt;
+          // Register the generated RDD for caching and checkpointing
+          if (storageLevel != StorageLevel.NONE) {
+            newRDD.persist(storageLevel)
+            logDebug(s&quot;Persisting RDD ${newRDD.id} for time $time to $storageLevel&quot;)
+          }
+          if (checkpointDuration != null &amp;&amp; (time - zeroTime).isMultipleOf(checkpointDuration)) {
+            newRDD.checkpoint()
+            logInfo(s&quot;Marking RDD ${newRDD.id} for time $time for checkpointing&quot;)
+          }
+          generatedRDDs.put(time, newRDD)
+        }
+        rddOption
+      } else {
+        None
+      }
+    }
+  }
+
+def map[U: ClassTag](mapFunc: T =&gt; U): DStream[U] = ssc.withScope {
+	new MappedDStream(this, context.sparkContext.clean(mapFunc))
+}
+
+</code></pre><h3 id="mappeddstream">MappedDStream</h3>
+<p>// 都是调用先调用 父DStream的 getOrCompute 方法。类似RDD，因为我是通过KafkaUtils创建的，所以第一个是DirectKafkaInputDStream。</p>
+<pre><code>private[streaming]
+class MappedDStream[T: ClassTag, U: ClassTag] (
+    parent: DStream[T],
+    mapFunc: T =&gt; U
+  ) extends DStream[U](parent.ssc) {
+
+  override def dependencies: List[DStream[_]] = List(parent)
+
+  override def slideDuration: Duration = parent.slideDuration
+
+  override def compute(validTime: Time): Option[RDD[U]] = {
+    // 这边的 .map(_.map[U](mapFunc))  实际上是 rdd.map(mapFunc)
+    parent.getOrCompute(validTime).map(_.map[U](mapFunc))
+  }
+}
+</code></pre><h3 id="directkafkainputdstream">DirectKafkaInputDStream</h3>
+<p>这个方法没有重写 getOrCompute   而是重写 compute ，最返回 Some（RDD）</p>
+<pre><code>override def compute(validTime: Time): Option[KafkaRDD[K, V]] = {
+  val untilOffsets = clamp(latestOffsets())
+  val offsetRanges = untilOffsets.map { case (tp, uo) =&gt;
+    val fo = currentOffsets(tp)
+    OffsetRange(tp.topic, tp.partition, fo, uo)
+  }
+  val useConsumerCache = context.conf.getBoolean(&quot;spark.streaming.kafka.consumer.cache.enabled&quot;,
+    true)
+  val rdd = new KafkaRDD[K, V](context.sparkContext, executorKafkaParams, offsetRanges.toArray,
+    getPreferredHosts, useConsumerCache)
+
+  // Report the record number and metadata of this batch interval to InputInfoTracker.
+  val description = offsetRanges.filter { offsetRange =&gt;
+    // Don't display empty ranges.
+    offsetRange.fromOffset != offsetRange.untilOffset
+  }.map { offsetRange =&gt;
+    s&quot;topic: ${offsetRange.topic}\tpartition: ${offsetRange.partition}\t&quot; +
+      s&quot;offsets: ${offsetRange.fromOffset} to ${offsetRange.untilOffset}&quot;
+  }.mkString(&quot;\n&quot;)
+  // Copy offsetRanges to immutable.List to prevent from being modified by the user
+  val metadata = Map(
+    &quot;offsets&quot; -&gt; offsetRanges.toList,
+    StreamInputInfo.METADATA_KEY_DESCRIPTION -&gt; description)
+  val inputInfo = StreamInputInfo(id, rdd.count, metadata)
+  ssc.scheduler.inputInfoTracker.reportInfo(validTime, inputInfo)
+
+  currentOffsets = untilOffsets
+  commitAll()
+  Some(rdd)
+}
+</code></pre><p>提交Job 地方</p>
+<p><img src="/images/image-20200216184714365.png" alt="image-20200216184714365"></p>
+<h1 id="checkpoint的真面目">Checkpoint的真面目</h1>
+<h2 id="dstream-checkpoint-的用法">Dstream Checkpoint 的用法</h2>
+<pre><code>object DstreamCheckpoint {
+  def main(args: Array[String]): Unit = {
+    val ssc = StreamingContext.getOrCreate(&quot;checkpoint_dir&quot;,functionToCreateContext)
+    ssc.sparkContext.setLogLevel(&quot;ERROR&quot;)
+    ssc.start()
+    ssc.awaitTermination()
+  }
+
+  def functionToCreateContext(): StreamingContext = {
+    println(&quot;functionToCreateContext invoke&quot;)
+    val sparkConf = new SparkConf()
+      .setMaster(&quot;local[*]&quot;)
+      .setAppName(&quot;DstreamCheckpoint&quot;)
+    val ssc = new StreamingContext(sparkConf,Durations.seconds(2))
+    val kafkaParams = Map[String, Object](
+      &quot;bootstrap.servers&quot; -&gt; &quot;s1:9092&quot;,
+      &quot;key.deserializer&quot; -&gt; classOf[StringDeserializer],
+      &quot;value.deserializer&quot; -&gt; classOf[StringDeserializer],
+      &quot;group.id&quot; -&gt; &quot;group_test&quot;,
+      &quot;auto.offset.reset&quot; -&gt; &quot;earliest&quot;,
+      &quot;enable.auto.commit&quot; -&gt; (false: java.lang.Boolean)
+    )
+    val topics = Array(&quot;test_mxb&quot;)
+    val dstream = KafkaUtils.createDirectStream(ssc,PreferConsistent,Subscribe[String, String](topics, kafkaParams))
+    dstream.map(record =&gt; (record.key, record.value,record.partition(),record.offset()))
+      .foreachRDD(rdd =&gt; {
+        ....
+        })
+      })
+    ssc.checkpoint(&quot;checkpoint_dir&quot;)
+    ssc
+  }
+}
+</code></pre><p>以上代码可以实现故障恢复和重启时回到之前的offset，但是如果对代码进行修改则无法进行回滚。</p>
+<pre><code> StreamingContext.getOrCreate(&quot;checkpoint_dir&quot;,functionToCreateContext) 是StreamingContext 的一个伴生对象的方法
+</code></pre><p>Spark源码：</p>
+<ol>
+<li>从checkpoint_dir 中读取  Checkpoint  对象，new StreamingContext ，反之读取不到 调用我们传入的 creatingFunc 函数去创建 StreamingContext 。 当使用Checkpoint 对象 去new  StreamingContext ，会触发一些方法，然后去从 Checkpoint 对象恢复StreamingContext 中 SparkContext、DStreamGraph对象。</li>
+</ol>
+<div class="highlight"><pre class="chroma"><code class="language-scala" data-lang="scala"><span class="k">def</span> <span class="n">getOrCreate</span><span class="o">(</span>
+    <span class="n">checkpointPath</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span>
+    <span class="n">creatingFunc</span><span class="k">:</span> <span class="o">()</span> <span class="o">=&gt;</span> <span class="nc">StreamingContext</span><span class="o">,</span>
+    <span class="n">hadoopConf</span><span class="k">:</span> <span class="kt">Configuration</span> <span class="o">=</span> <span class="nc">SparkHadoopUtil</span><span class="o">.</span><span class="n">get</span><span class="o">.</span><span class="n">conf</span><span class="o">,</span>
+    <span class="n">createOnError</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="kc">false</span>
+  <span class="o">)</span><span class="k">:</span> <span class="kt">StreamingContext</span> <span class="o">=</span> <span class="o">{</span>
+  <span class="k">val</span> <span class="n">checkpointOption</span> <span class="k">=</span> <span class="nc">CheckpointReader</span><span class="o">.</span><span class="n">read</span><span class="o">(</span>
+    <span class="n">checkpointPath</span><span class="o">,</span> <span class="k">new</span> <span class="nc">SparkConf</span><span class="o">(),</span> <span class="n">hadoopConf</span><span class="o">,</span> <span class="n">createOnError</span><span class="o">)</span>
+  <span class="n">checkpointOption</span><span class="o">.</span><span class="n">map</span><span class="o">(</span><span class="k">new</span> <span class="nc">StreamingContext</span><span class="o">(</span><span class="kc">null</span><span class="o">,</span> <span class="k">_</span><span class="o">,</span> <span class="kc">null</span><span class="o">)).</span><span class="n">getOrElse</span><span class="o">(</span><span class="n">creatingFunc</span><span class="o">())</span>
+<span class="o">}</span>
+
+</code></pre></div><ol start="2">
+<li>从 Checkpoint 对象恢复SparkContext、DStreamGraph</li>
+</ol>
+<pre><code>private[streaming] val sc: SparkContext = {
+  if (_sc != null) {
+    _sc
+  } else if (isCheckpointPresent) {
+    SparkContext.getOrCreate(_cp.createSparkConf())
+  } else {
+    throw new SparkException(&quot;Cannot create StreamingContext without a SparkContext&quot;)
+  }
+}
+</code></pre><pre><code>private[streaming] val graph: DStreamGraph = {
+  if (isCheckpointPresent) {
+    _cp.graph.setContext(this)
+    _cp.graph.restoreCheckpointData()
+    _cp.graph
+  } else {
+    require(_batchDur != null, &quot;Batch duration for StreamingContext cannot be null&quot;)
+    val newGraph = new DStreamGraph()
+    newGraph.setBatchDuration(_batchDur)
+    newGraph
+  }
+}
+</code></pre><h1 id="dstream-kafka-offset">DStream Kafka offset</h1>
+<h2 id="sparkstreamingkafkamaxrateperpartition">spark.streaming.kafka.maxRatePerPartition</h2>
+<h2 id="spark源码">Spark源码</h2>
+<h3 id="kafkautils">KafkaUtils</h3>
+<p>如果创建DirectKafkaInputDStream 时如果没有传 perPartitionConfig 则就会使用 PerPartitionConfig</p>
+<pre><code>def createDirectStream[K, V](
+    ssc: StreamingContext,
+    locationStrategy: LocationStrategy,
+    consumerStrategy: ConsumerStrategy[K, V]
+  ): InputDStream[ConsumerRecord[K, V]] = {
+  val ppc = new DefaultPerPartitionConfig(ssc.sparkContext.getConf)
+  createDirectStream[K, V](ssc, locationStrategy, consumerStrategy, ppc)
+}
+</code></pre><pre><code>def createDirectStream[K, V](
+    ssc: StreamingContext,
+    locationStrategy: LocationStrategy,
+    consumerStrategy: ConsumerStrategy[K, V],
+    perPartitionConfig: PerPartitionConfig
+  ): InputDStream[ConsumerRecord[K, V]] = {
+  new DirectKafkaInputDStream[K, V](ssc, locationStrategy, consumerStrategy, perPartitionConfig)
+}
+</code></pre><h3 id="perpartitionconfig">PerPartitionConfig</h3>
+<p>最关键的就是包含了 spark.streaming.kafka.maxRatePerPartition 和  spark.streaming.kafka.minRatePerPartition</p>
+<pre><code>private class DefaultPerPartitionConfig(conf: SparkConf)
+    extends PerPartitionConfig {
+  val maxRate = conf.getLong(&quot;spark.streaming.kafka.maxRatePerPartition&quot;, 0)
+  val minRate = conf.getLong(&quot; &quot;, 1)
+
+  def maxRatePerPartition(topicPartition: TopicPartition): Long = maxRate
+  override def minRatePerPartition(topicPartition: TopicPartition): Long = minRate
+}
+</code></pre><h3 id="directkafkainputdstream-1">DirectKafkaInputDStream</h3>
+<p>在每次发送GenerateJobs的消息时，就会触发Dstream的getOrCompute 或 compute</p>
+<pre><code>override def compute(validTime: Time): Option[KafkaRDD[K, V]] = {
+  val untilOffsets = clamp(latestOffsets())
+  val offsetRanges = untilOffsets.map { case (tp, uo) =&gt;
+    val fo = currentOffsets(tp)
+    OffsetRange(tp.topic, tp.partition, fo, uo)
+  }
+  val useConsumerCache = context.conf.getBoolean(&quot;spark.streaming.kafka.consumer.cache.enabled&quot;,
+    true)
+  val rdd = new KafkaRDD[K, V](context.sparkContext, executorKafkaParams, offsetRanges.toArray,
+    getPreferredHosts, useConsumerCache)
+
+  // Report the record number and metadata of this batch interval to InputInfoTracker.
+  val description = offsetRanges.filter { offsetRange =&gt;
+    // Don't display empty ranges.
+    offsetRange.fromOffset != offsetRange.untilOffset
+  }.map { offsetRange =&gt;
+    s&quot;topic: ${offsetRange.topic}\tpartition: ${offsetRange.partition}\t&quot; +
+      s&quot;offsets: ${offsetRange.fromOffset} to ${offsetRange.untilOffset}&quot;
+  }.mkString(&quot;\n&quot;)
+  // Copy offsetRanges to immutable.List to prevent from being modified by the user
+  val metadata = Map(
+    &quot;offsets&quot; -&gt; offsetRanges.toList,
+    StreamInputInfo.METADATA_KEY_DESCRIPTION -&gt; description)
+  val inputInfo = StreamInputInfo(id, rdd.count, metadata)
+  ssc.scheduler.inputInfoTracker.reportInfo(validTime, inputInfo)
+
+  currentOffsets = untilOffsets
+  commitAll()
+  Some(rdd)
+}
+</code></pre><pre><code>// limits the maximum number of messages per partition 
+// 限制每个分区的数据量
+// offsets 是最新的每个partition的offset map
+
+protected def clamp(
+  offsets: Map[TopicPartition, Long]): Map[TopicPartition, Long] = {
+
+  maxMessagesPerPartition(offsets).map { mmp =&gt;
+    mmp.map { case (tp, messages) =&gt;
+    	// 从map 通过分区获取 最新的offset
+        val uo = offsets(tp)
+        // tp 指向 当前offset + messages 和最新的offset 的最小值。
+        // message 就是一个批次的条数 offset 到 offset+message 就是下一个批次的offset 范围。
+        // 取最小值就是为了避便这个范围超过了 最新的offset
+        tp -&gt; Math.min(currentOffsets(tp) + messages, uo)
+    }
+  }.getOrElse(offsets)
+}
+</code></pre><pre><code>// 计算每个partition的offset 这边设计到反压机制，默认反压 是关闭的
+protected[streaming] def maxMessagesPerPartition(
+  offsets: Map[TopicPartition, Long]): Option[Map[TopicPartition, Long]] = {
+  
+  //默认没有开启反压，这边就是None
+  val estimatedRateLimit = rateController.map { x =&gt; {
+    val lr = x.getLatestRate()
+    if (lr &gt; 0) lr else initialRate
+  }}
+
+  // calculate a per-partition rate limit based on current lag
+  val effectiveRateLimitPerPartition = estimatedRateLimit.filter(_ &gt; 0) match {
+    case Some(rate) =&gt;
+      val lagPerPartition = offsets.map { case (tp, offset) =&gt;
+        tp -&gt; Math.max(offset - currentOffsets(tp), 0)
+      }
+      val totalLag = lagPerPartition.values.sum
+
+      lagPerPartition.map { case (tp, lag) =&gt;
+        val maxRateLimitPerPartition = ppc.maxRatePerPartition(tp)
+        val backpressureRate = lag / totalLag.toDouble * rate
+        tp -&gt; (if (maxRateLimitPerPartition &gt; 0) {
+          Math.min(backpressureRate, maxRateLimitPerPartition)} else backpressureRate)
+      }
+    case None =&gt; offsets.map { case (tp, offset) =&gt; 
+    	// 取出spark.streaming.kafka.maxRatePerPartition 每个分区的条数就是 这个配置的值
+    	tp -&gt; ppc.maxRatePerPartition(tp).toDouble }
+  }
+
+  if (effectiveRateLimitPerPartition.values.sum &gt; 0) {
+    val secsPerBatch = context.graph.batchDuration.milliseconds.toDouble / 1000
+    Some(effectiveRateLimitPerPartition.map {
+      // 然后取 每个批次的秒数 * maxRatePerPartition 和 minRatePerPartition 最大值
+      // 也就是 tp-&gt; limit (上个方法的 message)
+      case (tp, limit) =&gt; tp -&gt; Math.max((secsPerBatch * limit).toLong,
+        ppc.minRatePerPartition(tp))
+    })
+  } else {
+    None
+  }
+}
+</code></pre><pre><code>// 判断是否反压，没有有时None
+override protected[streaming] val rateController: Option[RateController] = {
+  if (RateController.isBackPressureEnabled(ssc.conf)) {
+    Some(new DirectKafkaRateController(id,
+      RateEstimator.create(ssc.conf, context.graph.batchDuration)))
+  } else {
+    None
+  }
+}
+</code></pre><p>正常情况就是</p>
+<p>maxRatePerPartition * second.interval 就是一个批次中一个分区的数据量</p>
+<p>maxRatePerPartition * second.interval*partition  就是一个整个批次的处理数据量</p>
+<h3 id="demo-1">Demo</h3>
+<pre><code>object KafkaDirectDstream {
+  def main(args: Array[String]): Unit = {
+    val sparkConf = new SparkConf().setAppName(&quot;KafkaDirectDstream&quot;)
+    sparkConf.setMaster(&quot;local[*]&quot;)
+    sparkConf.set(&quot;spark.streaming.kafka.maxRatePerPartition&quot;, &quot;1&quot;)
+    sparkConf.set(&quot;spark.serializer&quot;, &quot;org.apache.spark.serializer.KryoSerializer&quot;)
+    val streamingContext = new StreamingContext(sparkConf, Seconds(2))
+    streamingContext.sparkContext.setLogLevel(&quot;ERROR&quot;)
+    val kafkaParams = Map[String, Object](
+      &quot;bootstrap.servers&quot; -&gt; &quot;s1:9092&quot;,
+      &quot;key.deserializer&quot; -&gt; classOf[StringDeserializer],
+      &quot;value.deserializer&quot; -&gt; classOf[StringDeserializer],
+      &quot;group.id&quot; -&gt; &quot;p1&quot;,
+      &quot;auto.offset.reset&quot; -&gt; &quot;earliest&quot;,
+      &quot;enable.auto.commit&quot; -&gt; (false: java.lang.Boolean)
+    )
+    val topics = Array(&quot;test_topic&quot;)
+    
+    val dstream = KafkaUtils.createDirectStream[String, String](
+      streamingContext,
+      PreferConsistent,
+      Subscribe[String, String](topics, kafkaParams)
+    )
+
+    dstream.map(record =&gt; (record.key, record.value, record.partition(), record.offset()))
+      .foreachRDD(rdd =&gt; {
+        println(s&quot; Time: ${System.currentTimeMillis() / 1000}&quot;)
+        
+        rdd.mapPartitionsWithIndex((p, it) =&gt; {
+          println(s&quot; partition:${p} count:${it.count(x=&gt;true)}&quot;)
+          it
+        }).foreachPartition(v=&gt;null)
+
+      })
+    streamingContext.start()
+    streamingContext.awaitTermination()
+  }
+}
+</code></pre><h1 id="listenerbus">ListenerBus</h1>
+<p>Spark 很多地方需要对一些事件进行监听或处理，这就涉及到到了 Listener。</p>
+<p>比如：当一个Batch完成的时候，需要做什么。当stream 启动时候时候需要做什么等。再具体的例子，就是我想看每个batch 里面的数据量是多少</p>
+<p>对于不同场景有不同的 Listener</p>
+<p>比如 StreamingListener、SparkListener、StreamingQueryListener 等，对于Listener 也就对应不同的 ListenerBus，比如StreamingListenerBus、SparkListenerBus、StreamingQueryListenerBus。提到Bus 应该一种是对于多个Listener 。</p>
+<p>ListenerBus 是运行在Driver 端，消息发送是发生在Driver 或者 Executor 中</p>
+<p>我这以 StreamingListener 为例子</p>
+<p>定义一个我们想要的  DStreamListener 具体的需求是根据不事件来进行吃处理。比如每个batch 的数据量、batch 从哪个offset 到哪个offset 等</p>
+<h2 id="demo-2">Demo</h2>
+<pre><code>class DStreamListener extends StreamingListener{
+  /** Called when the streaming has been started */
+  override def onStreamingStarted(streamingStarted: StreamingListenerStreamingStarted): Unit = {
+  }
+
+
+  /** Called when a receiver has been started */
+  override def onReceiverStarted(receiverStarted: StreamingListenerReceiverStarted): Unit = {
+    receiverStarted.receiverInfo.streamId
+  }
+  
+  /** Called when processing of a batch of jobs has started.  */
+  override def onBatchStarted(batchStarted: StreamingListenerBatchStarted): Unit = {
+  	// 一个 batch 的数据量
+    println(s&quot;batchStarted numRecords ${batchStarted.batchInfo.numRecords}&quot;)
+  }
+  
+  .....  更多事件在 StreamingListener 里面可以看到
+}
+</code></pre><p>然后就是在StreamContext中加入这个Listener</p>
+<pre><code>object KafkaDirectDstream {
+  def main(args: Array[String]): Unit = {
+    val sparkConf = new SparkConf().setAppName(&quot;KafkaDirectDstream&quot;)
+    sparkConf.setMaster(&quot;local[*]&quot;)
+    sparkConf.set(&quot;spark.streaming.kafka.maxRatePerPartition&quot;, &quot;1&quot;)
+    sparkConf.set(&quot;spark.serializer&quot;, &quot;org.apache.spark.serializer.KryoSerializer&quot;)
+    val streamingContext = new StreamingContext(sparkConf, Seconds(2))
+    streamingContext.sparkContext.setLogLevel(&quot;ERROR&quot;)
+    val kafkaParams = Map[String, Object](
+      &quot;bootstrap.servers&quot; -&gt; &quot;s1:9092&quot;,
+      &quot;key.deserializer&quot; -&gt; classOf[StringDeserializer],
+      &quot;value.deserializer&quot; -&gt; classOf[StringDeserializer],
+      &quot;group.id&quot; -&gt; &quot;p1&quot;,
+      &quot;auto.offset.reset&quot; -&gt; &quot;earliest&quot;,
+      &quot;enable.auto.commit&quot; -&gt; (false: java.lang.Boolean)
+    )
+    val topics = Array(&quot;test_mxb&quot;)
+    val dstream = KafkaUtils.createDirectStream[String, String](
+      streamingContext,
+      PreferConsistent,
+      Subscribe[String, String](topics, kafkaParams)
+    )
+
+    dstream.map(record =&gt; (record.key, record.value, record.partition(), record.offset()))
+      .foreachRDD(rdd =&gt; {
+        .....
+      })
+      
+    // 加入监听器
+    streamingContext.addStreamingListener(new DStreamListener)
+    streamingContext.start()
+    streamingContext.awaitTermination()
+  }
+}
+</code></pre><h2 id="spark源码-1">Spark源码</h2>
+<h3 id="streamingcontext-1">StreamingContext</h3>
+<p>// 向 StreamingListenerBus 放入  Listener</p>
+<pre><code>def addStreamingListener(streamingListener: StreamingListener) {
+  scheduler.listenerBus.addListener(streamingListener)
+}
+</code></pre><h3 id="listenerbus-1">ListenerBus</h3>
+<p>底层实际是放入CopyOnWriteArrayList 中</p>
+<p>CopyOnWriteArrayList 是一个线程安全的List</p>
+<pre><code>private[this] val listenersPlusTimers = new CopyOnWriteArrayList[(L, Option[Timer])]
+
+// 放入list中
+final def addListener(listener: L): Unit = {
+  listenersPlusTimers.add((listener, getTimer(listener)))
+}
+	
+/**
+ * Returns a CodaHale metrics Timer for measuring the listener's event processing time.
+ * This method is intended to be overridden by subclasses.
+ */
+protected def getTimer(listener: L): Option[Timer] = None
+</code></pre><h3 id="jobscheduler-1">JobScheduler</h3>
+<p>//当有StreamJob提交时候</p>
+<pre><code>private def handleJobStart(job: Job, startTime: Long) {
+  val jobSet = jobSets.get(job.time)
+  val isFirstJobOfJobSet = !jobSet.hasStarted
+  jobSet.handleJobStart(job)
+  if (isFirstJobOfJobSet) {
+    // &quot;StreamingListenerBatchStarted&quot; should be posted after calling &quot;handleJobStart&quot; to get the
+    // correct &quot;jobSet.processingStartTime&quot;.
+    // 这边就发送 BatchStarted 的消息，并吧batch信息发送过去
+    listenerBus.post(StreamingListenerBatchStarted(jobSet.toBatchInfo))
+  }
+  job.setStartTime(startTime)
+  listenerBus.post(StreamingListenerOutputOperationStarted(job.toOutputOperationInfo))
+  logInfo(&quot;Starting job &quot; + job.id + &quot; from job set of time &quot; + jobSet.time)
+}
+</code></pre><h3 id="streaminglistenerbus">StreamingListenerBus</h3>
+<p>// 这边会对event 进行封装一层</p>
+<pre><code>def post(event: StreamingListenerEvent) {
+  sparkListenerBus.post(new WrappedStreamingListenerEvent(event))
+}
+
+
+</code></pre><p>当 StreamingListenerBus 启动后，就会将自己注册到 LiveListenerBus 中，sparkListenerBus 就是 LiveListenerBus</p>
+<pre><code>def start(): Unit = {
+  sparkListenerBus.addToStatusQueue(this)
+}
+</code></pre><h3 id="livelistenerbus">LiveListenerBus</h3>
+<pre><code>/** Post an event to all queues. */
+def post(event: SparkListenerEvent): Unit = {
+  if (stopped.get()) {
+    return
+  }
+
+  metrics.numEventsPosted.inc()
+
+  // If the event buffer is null, it means the bus has been started and we can avoid
+  // synchronization and post events directly to the queues. This should be the most
+  // common case during the life of the bus.
+  // 当 bus 启动后 queueEvents就为null，通常就会进入这个方法
+  if (queuedEvents == null) {
+    postToQueues(event)
+    return
+  }
+
+  // Otherwise, need to synchronize to check whether the bus is started, to make sure the thread
+  // calling start() picks up the new event.
+  synchronized {
+    if (!started.get()) {
+      queuedEvents += event
+      return
+    }
+  }
+
+  // If the bus was already started when the check above was made, just post directly to the
+  // queues.
+  postToQueues(event)
+}
+</code></pre><p>// 向 LiveListenerBus注册时，会将ListenerBus 放到 一类name相同的 AsyncEventQueue队列中，再把AsyncEventQueue 放入 CopyOnWriteArrayList 中</p>
+<pre><code>private[spark] def addToQueue(
+    listener: SparkListenerInterface,
+    queue: String): Unit = synchronized {
+  if (stopped.get()) {
+    throw new IllegalStateException(&quot;LiveListenerBus is stopped.&quot;)
+  }
+
+  queues.asScala.find(_.name == queue) match {
+    case Some(queue) =&gt;
+      queue.addListener(listener)
+
+    case None =&gt;
+      val newQueue = new AsyncEventQueue(queue, conf, metrics, this)
+      newQueue.addListener(listener)
+      if (started.get()) {
+        newQueue.start(sparkContext)
+      }
+      queues.add(newQueue)
+  }
+}
+</code></pre><p>AsyncEventQueue</p>
+<p>然后就是调用这个方法，queues 就是一类 ListenerBus的 AsyncEventQueue</p>
+<pre><code>private def postToQueues(event: SparkListenerEvent): Unit = {
+  val it = queues.iterator()
+  while (it.hasNext()) {
+    // 遍历所有的 AsyncEventQueue 发送 event
+    it.next().post(event)
+  }
+}
+</code></pre><h3 id="asynceventqueue">AsyncEventQueue</h3>
+<p>先放到一个队列中 （生产者 消费者模型）</p>
+<pre><code>def post(event: SparkListenerEvent): Unit = {
+  if (stopped.get()) {
+    return
+  }
+
+  eventCount.incrementAndGet()
+  // 放入里队列
+  if (eventQueue.offer(event)) {
+    return
+  }
+
+  eventCount.decrementAndGet()
+  droppedEvents.inc()
+  droppedEventsCounter.incrementAndGet()
+  if (logDroppedEvent.compareAndSet(false, true)) {
+    // Only log the following message once to avoid duplicated annoying logs.
+    logError(s&quot;Dropping event from queue $name. &quot; +
+      &quot;This likely means one of the listeners is too slow and cannot keep up with &quot; +
+      &quot;the rate at which tasks are being started by the scheduler.&quot;)
+  }
+  logTrace(s&quot;Dropping event $event&quot;)
+
+  val droppedCount = droppedEventsCounter.get
+  if (droppedCount &gt; 0) {
+    // Don't log too frequently
+    if (System.currentTimeMillis() - lastReportTimestamp &gt;= 60 * 1000) {
+      // There may be multiple threads trying to decrease droppedEventsCounter.
+      // Use &quot;compareAndSet&quot; to make sure only one thread can win.
+      // And if another thread is increasing droppedEventsCounter, &quot;compareAndSet&quot; will fail and
+      // then that thread will update it.
+      if (droppedEventsCounter.compareAndSet(droppedCount, 0)) {
+        val prevLastReportTimestamp = lastReportTimestamp
+        lastReportTimestamp = System.currentTimeMillis()
+        val previous = new java.util.Date(prevLastReportTimestamp)
+        logWarning(s&quot;Dropped $droppedCount events from $name since $previous.&quot;)
+      }
+    }
+  }
+}
+</code></pre><p>消费 当AsyncEventQueue 时就会启动一个线程去调用 dispatch</p>
+<pre><code>private val dispatchThread = new Thread(s&quot;spark-listener-group-$name&quot;) {
+  setDaemon(true)
+  override def run(): Unit = Utils.tryOrStopSparkContext(sc) {
+    dispatch()
+  }
+}
+</code></pre><pre><code>private def dispatch(): Unit = LiveListenerBus.withinListenerThread.withValue(true) {
+  var next: SparkListenerEvent = eventQueue.take()
+  // 循环
+  while (next != POISON_PILL) {
+    val ctx = processingTime.time()
+    try {
+      // 因为 AsyncEventQueue 继承了SparkListenerBus,SparkListenerBus继承了ListenerBus  ，回到 ListenerBus.postToAll
+      super.postToAll(next)
+    } finally {
+      ctx.stop()
+    }
+    eventCount.decrementAndGet()
+    next = eventQueue.take()
+  }
+  eventCount.decrementAndGet()
+}
+</code></pre><h3 id="listenerbus-2">ListenerBus</h3>
+<p>postToAll 会遍历 listener，发送消息</p>
+<pre><code>def postToAll(event: E): Unit = {
+  // JavaConverters can create a JIterableWrapper if we use asScala.
+  // However, this method will be called frequently. To avoid the wrapper cost, here we use
+  // Java Iterator directly.
+  // 
+  val iter = listenersPlusTimers.iterator
+  while (iter.hasNext) {
+    val listenerAndMaybeTimer = iter.next()
+    val listener = listenerAndMaybeTimer._1
+    val maybeTimer = listenerAndMaybeTimer._2
+    val maybeTimerContext = if (maybeTimer.isDefined) {
+      maybeTimer.get.time()
+    } else {
+      null
+    }
+    try {
+      // 关键
+      doPostEvent(listener, event)
+      if (Thread.interrupted()) {
+        // We want to throw the InterruptedException right away so we can associate the interrupt
+        // with this listener, as opposed to waiting for a queue.take() etc. to detect it.
+        throw new InterruptedException()
+      }
+    } catch {
+      case ie: InterruptedException =&gt;
+        logError(s&quot;Interrupted while posting to ${Utils.getFormattedClassName(listener)}.  &quot; +
+          s&quot;Removing that listener.&quot;, ie)
+        removeListenerOnError(listener)
+      case NonFatal(e) if !isIgnorableException(e) =&gt;
+        logError(s&quot;Listener ${Utils.getFormattedClassName(listener)} threw an exception&quot;, e)
+    } finally {
+      if (maybeTimerContext != null) {
+        maybeTimerContext.stop()
+      }
+    }
+  }
+}
+</code></pre><h1 id="dstream-window-函数">DStream Window 函数</h1>
+<p>DStream 中 window 函数有两种，一种是普通 WindowedDStream，另外一种是针对 window聚合 优化的 ReducedWindowedDStream。</p>
+<h2 id="demo-3">Demo</h2>
+<pre><code>object SocketWordCountDstreamReduceByWindow {
+  def main(args: Array[String]): Unit = {
+    val sparkConf = new SparkConf()
+      .setAppName(&quot;SocketWordCountDstream&quot;)
+      .setMaster(&quot;local[3]&quot;)
+    val sparkStreamContext = new StreamingContext(sparkConf,Seconds(5))
+    val sparkContext = sparkStreamContext.sparkContext
+    sparkContext.setLogLevel(&quot;WARN&quot;)
+    val dstream = sparkStreamContext.socketTextStream(&quot;localhost&quot;,9090)
+    val v = dstream.flatMap(_.split(&quot; &quot;))
+      .map((_,1))
+        .reduceByKeyAndWindow((p:Int,c:Int)=&gt;{
+          p + c
+        },Durations.seconds(15),Durations.seconds(5))
+    v.foreachRDD(...)
+    sparkStreamContext.start()
+    sparkStreamContext.awaitTermination()
+  }
+}
+</code></pre><h2 id="源码">源码</h2>
+<p>###　DStream</p>
+<p>前提知识</p>
+<p>在每个DStream 中会把每个batch 产生的 Rdd 放入Map中，也就是放到内存中。</p>
+<pre><code>
+// 保存RDD的 Map
+@transient
+private[streaming] var generatedRDDs = new HashMap[Time, RDD[T]]()
+
+ private[streaming] final def getOrCompute(time: Time): Option[RDD[T]] = {
+    // If RDD was already generated, then retrieve it from HashMap,
+    // or else compute the RDD
+	// 如果map 中就直接拿着用，没有就创建
+    generatedRDDs.get(time).orElse {
+      
+      if (isTimeValid(time)) {
+        val rddOption = createRDDWithLocalProperties(time, displayInnerRDDOps = false) {
+          SparkHadoopWriterUtils.disableOutputSpecValidation.withValue(true) {
+            compute(time)
+          }
+        }
+
+        rddOption.foreach { case newRDD =&gt;
+          // Register the generated RDD for caching and checkpointing
+          if (storageLevel != StorageLevel.NONE) {
+            newRDD.persist(storageLevel)
+            logDebug(s&quot;Persisting RDD ${newRDD.id} for time $time to $storageLevel&quot;)
+          }
+          if (checkpointDuration != null &amp;&amp; (time - zeroTime).isMultipleOf(checkpointDuration)) {
+            newRDD.checkpoint()
+            logInfo(s&quot;Marking RDD ${newRDD.id} for time $time for checkpointing&quot;)
+          }
+          
+          // 放入Map中 
+          generatedRDDs.put(time, newRDD)
+        }
+        rddOption
+      } else {
+        None
+      }
+    }
+  }
+</code></pre><p>同时也会 batch 完成的时候去清理这个Map。</p>
+<pre><code>private[streaming] def clearMetadata(time: Time) {
+  
+  //根据当前 batch time - rememberDuration 
+  //time = 100030, rememberDuration = 10 , generatedRDDs = {100020-&gt;rdd}
+  
+
+  val oldRDDs = generatedRDDs.filter(_._1 &lt;= (time - rememberDuration))
+  generatedRDDs --= oldRDDs.keys
+  if (unpersistData) {
+    logDebug(s&quot;Unpersisting old RDDs: ${oldRDDs.values.map(_.id).mkString(&quot;, &quot;)}&quot;)
+    oldRDDs.values.foreach { rdd =&gt;
+      rdd.unpersist(false)
+      // Explicitly remove blocks of BlockRDD
+      rdd match {
+        case b: BlockRDD[_] =&gt;
+          logInfo(s&quot;Removing blocks of RDD $b of time $time&quot;)
+          b.removeBlocks()
+        case _ =&gt;
+      }
+    }
+  }
+
+  dependencies.foreach(_.clearMetadata(time))
+}
+</code></pre><p>这个清理的过程是从后往前的，先清理  子DStream  然后是父DStream</p>
+<pre><code>
+// 默认 rememberDuration = slideDuration  也就是 batchInterval 。
+private[streaming] var rememberDuration: Duration = null
+
+//所以这边 父继承子
+private[streaming] def parentRememberDuration = rememberDuration
+
+
+</code></pre><p>DStream 初始化时</p>
+<pre><code>private[streaming] def initialize(time: Time) {
+
+  var minRememberDuration = slideDuration
+  
+  // checkpointDuration 一般的DStream都是空的
+  
+  if (checkpointDuration != null &amp;&amp; minRememberDuration &lt;= checkpointDuration) {
+    minRememberDuration = checkpointDuration * 2
+  }
+  if (rememberDuration == null || rememberDuration &lt; minRememberDuration) {
+    rememberDuration = minRememberDuration
+  }
+
+  // Initialize the dependencies
+  dependencies.foreach(_.initialize(zeroTime))
+}
+</code></pre><pre><code>// 抽象方法
+// slideDuration 官方的注释是：方法是 DStream生成RDD的时间间隔。
+// 默认情况下 slideDuration  就是 batchInterval 。针对 WindowedDStream  就是滑动的时间  但也是批次的时间
+def slideDuration: Duration
+</code></pre><p>这边举个例子  interval = 1s  window = 4s  slide = 2s。JobGenerator 会每个隔   interval = 1s 发送 GenerateJobs 事件，然后会触发 最后一个DStream  的 getOrCompute，然后依次 compute 会优先调 parent.getOrCompute 依次递归到第一个DStream。但是 getOrCompute  会判断这个 batch 的 Time - zeroTime（zeroTime 是 Stream 开始的时间，第一个batch 就是 zeroTime + batchInterval） 是不是 slideDuration 的倍数。如果是 才会调 compute 否则 就会返回 None。</p>
+<pre><code>private[streaming] final def getOrCompute(time: Time): Option[RDD[T]] = {
+  // If RDD was already generated, then retrieve it from HashMap,
+  // or else compute the RDD
+  generatedRDDs.get(time).orElse {
+    // Compute the RDD if time is valid (e.g. correct time in a sliding window)
+    // of RDD generation, else generate nothing.
+    if (isTimeValid(time)) {
+		....
+        rdd
+      }
+      rddOption
+    } else {
+      None
+    }
+  }
+}
+</code></pre><p>校验时间。 zeroTime 就是第一个Batch的时间</p>
+<pre><code>private[streaming] def isTimeValid(time: Time): Boolean = {
+  if (!isInitialized) {
+    throw new SparkException (this + &quot; has not been initialized&quot;)
+  } else if (time &lt;= zeroTime || ! (time - zeroTime).isMultipleOf(slideDuration)) {
+    logInfo(s&quot;Time $time is invalid as zeroTime is $zeroTime&quot; +
+      s&quot; , slideDuration is $slideDuration and difference is ${time - zeroTime}&quot;)
+    false
+  } else {
+    logDebug(s&quot;Time $time is valid&quot;)
+    true
+  }
+}
+</code></pre><p>例如常见  MappedDStream  是父 DStream 的  slideDuration</p>
+<pre><code>override def slideDuration: Duration = parent.slideDuration 
+</code></pre><p>第一个DStream 的 slideDuration = batchDuration</p>
+<pre><code>override def slideDuration: Duration = {
+  if (ssc == null) throw new Exception(&quot;ssc is null&quot;)
+  if (ssc.graph.batchDuration == null) throw new Exception(&quot;batchDuration is null&quot;)
+  ssc.graph.batchDuration
+}
+</code></pre><h3 id="inputdstream">InputDStream</h3>
+<p>InputDStream（输入流就是数据源） 是 DirectKafkaInputDStream 、FileInputDStream&hellip;.. 的父类。 输入流都是继承这个方法。</p>
+<pre><code>override def slideDuration: Duration = {
+  if (ssc == null) throw new Exception(&quot;ssc is null&quot;)
+  if (ssc.graph.batchDuration == null) throw new Exception(&quot;batchDuration is null&quot;)
+  // 就是 new StreamContext  传入流的间隔时间
+  ssc.graph.batchDuration
+}
+</code></pre><p>默认情况下就是  slideDuration  =  batchInterval 批次间隔时间</p>
+<p>也就是 rememberDuration =  batchInterval   ， parentRememberDuration = batchInterval  。默认只会保留上次一个batch的RDD。</p>
+<p>进入正题。</p>
+<p>源码的入口就是 reduceByKeyAndWindow</p>
+<h3 id="pairdstreamfunctions">PairDStreamFunctions</h3>
+<p>实际就是 dstream.reduceByKey().window().reduceByKey，点开window()</p>
+<pre><code>def reduceByKeyAndWindow(
+    reduceFunc: (V, V) =&gt; V,
+    windowDuration: Duration,
+    slideDuration: Duration,
+    partitioner: Partitioner
+  ): DStream[(K, V)] = ssc.withScope {
+  self.reduceByKey(reduceFunc, partitioner)
+      .window(windowDuration, slideDuration)
+      .reduceByKey(reduceFunc, partitioner)
+}
+</code></pre><h3 id="dstream-2">DStream</h3>
+<p>其实只要是DStream 都有 window 函数</p>
+<pre><code>def window(windowDuration: Duration, slideDuration: Duration): DStream[T] = ssc.withScope {
+  new WindowedDStream(this, windowDuration, slideDuration)
+}
+
+</code></pre><h3 id="windoweddstream">WindowedDStream</h3>
+<p>跟到 WindowedDStream 类</p>
+<pre><code>class WindowedDStream[T: ClassTag](
+    parent: DStream[T],
+    _windowDuration: Duration,
+    _slideDuration: Duration)
+  extends DStream[T](parent.ssc) {
+
+
+  // Persist parent level by default, as those RDDs are going to be obviously reused.
+  // 默认吧 parent dsteam 进行持久化，因为 parent.dsteam中的rdd 将会被吃
+   parent.persist(StorageLevel.MEMORY_ONLY_SER)
+  
+  // 窗口时间
+  def windowDuration: Duration = _windowDuration
+
+  override def dependencies: List[DStream[_]] = List(parent)
+
+  // 这边的 slideDuration 就不是parent.slideDuration 而是我们定传入 window方法的滑动间隔。
+  override def slideDuration: Duration = _slideDuration
+  
+
+  // parentRememberDuration 是 slideDuration + windowDuration 
+  override def parentRememberDuration: Duration = rememberDuration + windowDuration
+  
+  
+  override def compute(validTime: Time): Option[RDD[T]] = {
+    val currentWindow = new Interval(validTime - windowDuration + parent.slideDuration, validTime)
+    
+    // 获取一个范围内的RDD
+    val rddsInWindow = parent.slice(currentWindow)
+    // 最后union 范围内的RDD
+    Some(ssc.sc.union(rddsInWindow))
+  }
+}
+</code></pre><h3 id="dstream-3">DStream</h3>
+<pre><code>def slice(fromTime: Time, toTime: Time): Seq[RDD[T]] = ssc.withScope {
+  if (!isInitialized) {
+    throw new SparkException(this + &quot; has not been initialized&quot;)
+  }
+
+  // windowStream.parent 就是普通的DStream slideDuration = batchInterval
+  // zeroTime 是 Stream 开始的时间，第一个batch 就是 zeroTime + batchInterval
+  截至时间到第一个batch的时间  是不是  batchInterval 的倍数。主要是方便计算
+  val alignedToTime = if ((toTime - zeroTime).isMultipleOf(slideDuration)) {
+    toTime
+  } else {
+    logWarning(s&quot;toTime ($toTime) is not a multiple of slideDuration ($slideDuration)&quot;)
+    toTime.floor(slideDuration, zeroTime)
+  }
+
+  // 同理 开始时间到第一个batch的时间  是不是  batchInterval 的倍数。主要是方便计算
+  val alignedFromTime = if ((fromTime - zeroTime).isMultipleOf(slideDuration)) {
+    fromTime
+  } else {
+    logWarning(s&quot;fromTime ($fromTime) is not a multiple of slideDuration ($slideDuration)&quot;)
+    fromTime.floor(slideDuration, zeroTime)
+  }
+
+  logInfo(s&quot;Slicing from $fromTime to $toTime&quot; +
+    s&quot; (aligned to $alignedFromTime and $alignedToTime)&quot;)
+
+  alignedFromTime.to(alignedToTime, slideDuration).flatMap { time =&gt;
+    //最后将这一个时间段的 根据 slideDuration 来切分，然后得到之前 batch的Time
+    // 然后 到DStrem getOrCompute 中，从内存中重新取回来。
+    if (time &gt;= zeroTime) getOrCompute(time) else None
+  }
+}
+</code></pre><h3 id="例子">例子</h3>
+<p>这边还是举个例子  interval = 1s  window = 4s  slice = 2s。zeroTime = 1582800004.000</p>
+<p>isTimeValid  = （Time -  zeroTime  %  slide 是否为整数）</p>
+<p>1s后 ，Time = 1582800005  ，先到到 WindowedDStream  isTimeValid  = false   None</p>
+<p>2s后 ，Time = 1582800006 ， 先到到 WindowedDStream  isTimeValid  = true   :</p>
+<p>1、val currentWindow = new Interval(validTime - windowDuration + parent.slideDuration, validTime)</p>
+<p>​     第一个参数 1582800006 - 4  + 1 = 1582800003</p>
+<p>​     第二个参数  1582800006</p>
+<p>2、parent.slice(1582800003,1582800006 )   也就是取 1582800003、1582800004、1582800005、1582800006 四个时间的RDD。1582800003、1582800004 是无效的时间 直接是None  ，然后调用</p>
+<p>getOrCompute（1582800005）和 getOrCompute（1582800006 ） ，这样就取到 1582800005 的 RDD，虽然1582800005  时刻的返回的是None  到了 1582800006 就会把1582800005   取到，依次类推就好了。</p>
+<h2 id="demo-2-1">Demo 2</h2>
+<p>大家想，如果一个Window 的时间比较长，并且 reduceBykey().window().reduceBykey 涉及的计算比较慢。每次都需要重新计算 4个batch的RDD ，很浪费（前提是不是去重计算 ） 。</p>
+<p>假设 batchInterval = 1s     window = 4s      sliace = 1s</p>
+<p>这边的数字代表时间戳</p>
+<p>第一次 计算  1、2、3、4  的RDD</p>
+<p>第二次 计算  2、3、4、5 的RDD</p>
+<p>第三次 计算  3、4、 5、6、 的RDD</p>
+<p>规律就是 上一次计算的结果 可以被下一次所副复用，减少计算。怎么服用呢</p>
+<p>第一个 1、2、3、4    减 1的RDD 加 5的RDD 就可以了。</p>
+<pre><code>object SocketWordCountDstreamReduceByWindowOptimization {
+  def main(args: Array[String]): Unit = {
+    val sparkConf = new SparkConf()
+      .setAppName(&quot;SocketWordCountDstream&quot;)
+      .setMaster(&quot;local[3]&quot;)
+    val sparkStreamContext = new StreamingContext(sparkConf,Seconds(1))
+    val sparkContext = sparkStreamContext.sparkContext
+    sparkContext.setLogLevel(&quot;WARN&quot;)
+    val dstream = sparkStreamContext.socketTextStream(&quot;localhost&quot;,9090)
+    val v = dstream.flatMap(_.split(&quot; &quot;))
+      .map((_,1))
+        .reduceByKeyAndWindow((p:Int,c:Int)=&gt;{
+          p + c
+        },(c:Int,p:Int)=&gt;{
+          c - p
+        },Durations.seconds(4),Durations.seconds(2))
+    v.foreachRDD(rdd =&gt; {
+      ....
+    })
+    sparkStreamContext.start()
+    sparkStreamContext.awaitTermination()
+  }
+}
+</code></pre><h3 id="pairdstreamfunctions-1">PairDStreamFunctions</h3>
+<p>需要传入两个关键的函数，第一个就是 减去  slide/batchinterval 个 RDD 的函数，第二个就是加上 slide/batchinterval 个 RDD 的函数。</p>
+<pre><code>def reduceByKeyAndWindow(
+    reduceFunc: (V, V) =&gt; V,
+    invReduceFunc: (V, V) =&gt; V,
+    windowDuration: Duration,
+    slideDuration: Duration,
+    partitioner: Partitioner,
+    filterFunc: ((K, V)) =&gt; Boolean
+  ): DStream[(K, V)] = ssc.withScope {
+
+  val cleanedReduceFunc = ssc.sc.clean(reduceFunc)
+  val cleanedInvReduceFunc = ssc.sc.clean(invReduceFunc)
+  val cleanedFilterFunc = if (filterFunc != null) Some(ssc.sc.clean(filterFunc)) else None
+  new ReducedWindowedDStream[K, V](
+    self, cleanedReduceFunc, cleanedInvReduceFunc, cleanedFilterFunc,
+    windowDuration, slideDuration, partitioner
+  )
+}
+</code></pre><h3 id="reducedwindoweddstream">ReducedWindowedDStream</h3>
+<p>几个关键都是和window 一样</p>
+<pre><code>def windowDuration: Duration = _windowDuration
+
+override def dependencies: List[DStream[_]] = List(reducedStream)
+
+override def slideDuration: Duration = _slideDuration
+// 这个就是 需要 checkpoint
+override val mustCheckpoint = true
+
+override def parentRememberDuration: Duration = rememberDuration + windowDuration
+</code></pre><p>怎么获取上一个batch的RDD，可以之在map 中，根据 time - slideDuration 就是上一个批次的时间。</p>
+<p>例如 batchInterval = 1s    window = 4s     slide = 2s</p>
+<p>当前 时间 100006</p>
+<p>上一个widow  的区间 [  100001，100002，100003，100004 ]</p>
+<p>第一个：需要减去的RDD 区间  [ 100001，100002 ]  （区间的表示，下同）</p>
+<p>第二个：需要加上的RDD 区间  [ 100005，100006 ]</p>
+<p>期望    ： [100003，100006 ]</p>
+<pre><code>// 这个就是 parent　DStream，这边只是做了一个转换。
+private val reducedStream = parent.reduceByKey(reduceFunc, partitioner)
+
+override def compute(validTime: Time): Option[RDD[(K, V)]] = {
+  val reduceF = reduceFunc
+  val invReduceF = invReduceFunc
+
+  val currentTime = validTime
+  // 这边计算后就是 [100006 - 4 + 1 ,100006] =&gt; [100003 ,100006]
+  val currentWindow = new Interval(currentTime - windowDuration + parent.slideDuration,
+    currentTime)
+  // 这边计算后就是 [100003-2,100006-2] =&gt; [100001,100004]  上一个Window的区间
+  val previousWindow = currentWindow - slideDuration
+
+  //  _____________________________
+  // |  previous window   _________|___________________
+  // |___________________|       current window        |  --------------&gt; Time
+  //                     |_____________________________|
+  //
+  // |________ _________|          |________ _________|
+  //          |                             |
+  //          V                             V
+  //       old RDDs                     new RDDs
+  //
+
+  // Get the RDDs of the reduced values in &quot;old time steps&quot;
+  
+  // 这边计算后就是 [100001,100004-2] =&gt; [100001,100002] 和我们之前预算的一致
+  val oldRDDs =
+    reducedStream.slice(previousWindow.beginTime, currentWindow.beginTime - parent.slideDuration)
+  logDebug(&quot;# old RDDs = &quot; + oldRDDs.size)
+
+  // Get the RDDs of the reduced values in &quot;new time steps&quot;
+  //这边计算后就是 [100004+1,100006] 注意 parent.slideDuration = batchInterval 
+  val newRDDs =
+    reducedStream.slice(previousWindow.endTime + parent.slideDuration, currentWindow.endTime)
+  logDebug(&quot;# new RDDs = &quot; + newRDDs.size)
+
+  // Get the RDD of the reduced value of the previous window
+  // 获取上一个window 的RDD
+  val previousWindowRDD =
+    getOrCompute(previousWindow.endTime).getOrElse(ssc.sc.makeRDD(Seq[(K, V)]()))
+
+  // Make the list of RDDs that needs to cogrouped together for reducing their reduced values
+  val allRDDs = new ArrayBuffer[RDD[(K, V)]]() += previousWindowRDD ++= oldRDDs ++= newRDDs
+
+  // Cogroup the reduced RDDs and merge the reduced valuesRDD
+  // 将 三个RDD cogroupe也就是 合并
+  val cogroupedRDD = new CoGroupedRDD[K](allRDDs.toSeq.asInstanceOf[Seq[RDD[(K, _)]]],
+    partitioner)
+  // val mergeValuesFunc = mergeValues(oldRDDs.size, newRDDs.size) _
+
+  val numOldValues = oldRDDs.size
+  val numNewValues = newRDDs.size
+
+  val mergeValues = (arrayOfValues: Array[Iterable[V]]) =&gt; {
+    if (arrayOfValues.length != 1 + numOldValues + numNewValues) {
+      throw new Exception(&quot;Unexpected number of sequences of reduced values&quot;)
+    }
+    // Getting reduced values &quot;old time steps&quot; that will be removed from current window
+   // 拿到 需要减去oldrdd 的 值
+   val oldValues = (1 to numOldValues).map(i =&gt; arrayOfValues(i)).filter(!_.isEmpty).map(_.head)
+    // Getting reduced values &quot;new time steps&quot;
+    
+     // 拿到 需要加上 oldrdd 的 值
+    val newValues =
+      (1 to numNewValues).map(i =&gt; arrayOfValues(numOldValues + i)).filter(!_.isEmpty).map(_.head)
+    // 判断上一个Window的Rdd值是不是 
+    if (arrayOfValues(0).isEmpty) {
+      // If previous window's reduce value does not exist, then at least new values should exist
+      if (newValues.isEmpty) {
+        throw new Exception(&quot;Neither previous window has value for key, nor new values found. &quot; +
+          &quot;Are you sure your key class hashes consistently?&quot;)
+      }
+      // Reduce the new values
+      // 如果上一个window 是空的，直接只计算新值
+      newValues.reduce(reduceF) // return
+    } else {
+      // Get the previous window's reduced value
+      var tempValue = arrayOfValues(0).head
+      // If old values exists, then inverse reduce then from previous value
+      if (!oldValues.isEmpty) {
+         // 减去 oldRDDs，其实应该说对 上一个window 的值和 oldValues 处理
+        tempValue = invReduceF(tempValue, oldValues.reduce(reduceF))
+      }
+      // If new values exists, then reduce them with previous value
+      if (!newValues.isEmpty) {
+        // 加上 newRdd的值，其实应该说对 上一个window 的值和 newValues 处理
+        tempValue = reduceF(tempValue, newValues.reduce(reduceF))
+      }
+      tempValue // return
+    }
+  }
+
+  // 调用上面的函数 拿到当前的值
+  val mergedValuesRDD = cogroupedRDD.asInstanceOf[RDD[(K, Array[Iterable[V]])]]
+    .mapValues(mergeValues)
+
+  if (filterFunc.isDefined) {
+    Some(mergedValuesRDD.filter(filterFunc.get))
+  } else {
+    Some(mergedValuesRDD)
+  }
+}
+</code></pre>
+  </section>
+
+  <section>
+    
+      
+    
+  </section>
+</article>
+
+      </div>
+
+      <div id="side" class="pr-1 bg-white">
+        <aside class="pr-3">
+          
+  
+    <div id="toc" class="Box Box--blue mb-3">
+      <b>Spark DStream的源码和原理</b><nav id="TableOfContents">
+  <ul>
+    <li><a href="#demo">Demo</a></li>
+    <li><a href="#spark-源码分析">Spark 源码分析</a>
+      <ul>
+        <li><a href="#streamingcontext">StreamingContext</a></li>
+        <li><a href="#jobscheduler">JobScheduler</a></li>
+        <li><a href="#recurringtimer">RecurringTimer</a></li>
+        <li><a href="#dstreamgraph">DStreamGraph</a></li>
+        <li><a href="#dstream">DStream</a></li>
+        <li><a href="#dstreamgraph-1">DStreamGraph</a></li>
+        <li><a href="#dstream-1">DStream</a></li>
+        <li><a href="#mappeddstream">MappedDStream</a></li>
+        <li><a href="#directkafkainputdstream">DirectKafkaInputDStream</a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <ul>
+    <li><a href="#dstream-checkpoint-的用法">Dstream Checkpoint 的用法</a></li>
+  </ul>
+
+  <ul>
+    <li><a href="#sparkstreamingkafkamaxrateperpartition">spark.streaming.kafka.maxRatePerPartition</a></li>
+    <li><a href="#spark源码">Spark源码</a>
+      <ul>
+        <li><a href="#kafkautils">KafkaUtils</a></li>
+        <li><a href="#perpartitionconfig">PerPartitionConfig</a></li>
+        <li><a href="#directkafkainputdstream-1">DirectKafkaInputDStream</a></li>
+        <li><a href="#demo-1">Demo</a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <ul>
+    <li><a href="#demo-2">Demo</a></li>
+    <li><a href="#spark源码-1">Spark源码</a>
+      <ul>
+        <li><a href="#streamingcontext-1">StreamingContext</a></li>
+        <li><a href="#listenerbus-1">ListenerBus</a></li>
+        <li><a href="#jobscheduler-1">JobScheduler</a></li>
+        <li><a href="#streaminglistenerbus">StreamingListenerBus</a></li>
+        <li><a href="#livelistenerbus">LiveListenerBus</a></li>
+        <li><a href="#asynceventqueue">AsyncEventQueue</a></li>
+        <li><a href="#listenerbus-2">ListenerBus</a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <ul>
+    <li><a href="#demo-3">Demo</a></li>
+    <li><a href="#源码">源码</a>
+      <ul>
+        <li><a href="#inputdstream">InputDStream</a></li>
+        <li><a href="#pairdstreamfunctions">PairDStreamFunctions</a></li>
+        <li><a href="#dstream-2">DStream</a></li>
+        <li><a href="#windoweddstream">WindowedDStream</a></li>
+        <li><a href="#dstream-3">DStream</a></li>
+        <li><a href="#例子">例子</a></li>
+      </ul>
+    </li>
+    <li><a href="#demo-2-1">Demo 2</a>
+      <ul>
+        <li><a href="#pairdstreamfunctions-1">PairDStreamFunctions</a></li>
+        <li><a href="#reducedwindoweddstream">ReducedWindowedDStream</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav></div>
+  
+
+  
+    <div>
+      
+    </div>
+  
+
+        </aside>
+      </div>
+
+      <div id="footer" class="pt-2 pb-3 bg-white text-center">
+        
+
+  <span class="text-small text-gray">
+    
+
+    Powered by the
+    <a href="https://github.com/qqhann/hugo-primer" class="link-gray-dark">Hugo-Primer</a> theme for
+    <a href="https://gohugo.io" class="link-gray-dark">Hugo</a>.
+  </span>
+
+
+      </div>
+    </div>
+
+    
+    
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/x-mathjax-config">MathJax.Hub.Config({ tex2jax: { inlineMath: [['$','$'], ['\\(','\\)']] } });</script>
+    
+  </body>
+</html>

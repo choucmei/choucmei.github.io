@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    
+    
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-12345678-0', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+    
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+      
+  ElasticSearch 入门级 &ndash; chouc
+
+    </title>
+    
+    
+    <meta name="description" property="og:description" content="Elasticsearch是一个基于Apache Lucene(TM)的开源搜索引擎。无论在开源还是专有领域，Lucene可以被认为是迄今为止|chouc&#39;s blog">
+    
+
+    <meta name="apple-mobile-web-app-title" content="chouc">
+    
+    
+    
+    
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:site" content="@">
+    <meta name="twitter:creator" content="@">
+    <meta name="twitter:title" content="ElasticSearch 入门级 | chouc">
+    <meta name="twitter:description" content="Elasticsearch是一个基于Apache Lucene(TM)的开源搜索引擎。无论在开源还是专有领域，Lucene可以被认为是迄今为止|chouc&#39;s blog">
+    <meta name="twitter:image" content="http://localhost:1313/twitter-card.png">
+    
+
+
+    <link rel="stylesheet" href="/assets/syntax.css">
+    <link rel="stylesheet" href="/assets/primer-build.css">
+    <link rel="stylesheet" href="/assets/style.css">
+  </head>
+
+
+  <body class="bg-gray">
+    <div id="holy" class="container-lg bg-white h-100">
+
+      <div id="header" class="px-1 bg-white">
+        <nav class="UnderlineNav UnderlineNav--right px-2">
+  <a class="UnderlineNav-actions muted-link h2" href="http://localhost:1313/">
+    chouc
+  </a>
+
+  
+  
+  <div class="UnderlineNav-body">
+    
+    
+    
+    <a class="UnderlineNav-item " href="/">
+      
+      <span>Blog</span>
+    </a>
+    
+    
+    
+    
+    <a class="UnderlineNav-item " href="/about/">
+      
+      <span>About</span>
+    </a>
+    
+    
+  </div>
+  
+</nav>
+
+      </div>
+
+      <div role="main" id="main" class="holy-main markdown-body px-4 bg-white">
+        
+
+<div class="Subhead">
+  <div class="Subhead-heading">
+    <div class="h1 mt-3 mb-1">ElasticSearch 入门级</div>
+  </div>
+  <div class="Subhead-description">
+    
+
+
+<a href='/categories/bigdata' class="muted-link">
+  <span class="Label Label--gray-darker">Bigdata</span>
+</a>
+
+
+
+<a href='/tags/es' class="muted-link">
+  <span class="Label Label--gray">ES</span>
+</a>
+
+
+    
+    <div class="float-md-right">
+      <span title="Lastmod: 2019-03-05. Published at: 2019-03-05.">
+        
+          Published: 2019-03-05
+        
+      </span>
+    </div>
+    
+  </div>
+</div>
+<article>
+  
+  <section class="pb-6 mb-3 border-bottom">
+    <p>Elasticsearch是一个基于<a href="https://lucene.apache.org/core/">Apache Lucene(TM)</a>的开源搜索引擎。无论在开源还是专有领域，Lucene可以被认为是迄今为止最先进、性能最好的、功能最全的搜索引擎库。</p>
+<p>但是，Lucene只是一个库。想要使用它，你必须使用Java来作为开发语言并将其直接集成到你的应用中，更糟糕的是，Lucene非常复杂，你需要深入了解检索的相关知识来理解它是如何工作的。</p>
+<p>Elasticsearch也使用Java开发并使用Lucene作为其核心来实现所有索引和搜索的功能，但是它的目的是通过简单的<code>RESTful API</code>来隐藏Lucene的复杂性，从而让全文搜索变得简单。</p>
+<p>不过，Elasticsearch不仅仅是Lucene和全文搜索，我们还能这样去描述它：</p>
+<ul>
+<li>分布式的实时文件存储，每个字段都被索引并可被搜索</li>
+<li>分布式的实时分析搜索引擎</li>
+<li>可以扩展到上百台服务器，处理PB级结构化或非结构化数据</li>
+</ul>
+<p>而且，所有的这些功能被集成到一个服务里面，你的应用可以通过简单的<code>RESTful API</code>、各种语言的客户端甚至命令行与之交互。</p>
+<p>上手Elasticsearch非常容易。它提供了许多合理的缺省值，并对初学者隐藏了复杂的搜索引擎理论。它开箱即用（安装即可使用），只需很少的学习既可在生产环境中使用。</p>
+<p>Elasticsearch在<a href="http://www.apache.org/licenses/LICENSE-2.0.html">Apache 2 license</a>下许可使用，可以免费下载、使用和修改。</p>
+<p>随着你对Elasticsearch的理解加深，你可以根据不同的问题领域定制Elasticsearch的高级特性，这一切都是可配置的，并且配置非常灵活。</p>
+<h1 id="rest">REST</h1>
+<ul>
+<li>Representational State Transfer</li>
+</ul>
+<p>一种软件架构风格，而不是标准，只是提供了一组设计原则和约束条件。它主要用于客户端和服务器交互类的软件。基于这个风格设计的软件可以更简洁，更有层次，更易于实现缓存等机制。</p>
+<p><img src="/images/image-20200308220744690.png" alt="image-20200308220744690"></p>
+<h1 id="核心算法">核心算法</h1>
+<p>##　正排索引</p>
+<p>ES核心算法是倒排索引，可以先简单谈谈正排索引。</p>
+<h3 id="例如">例如</h3>
+<p><code>url1</code> 的内容是<code>林俊杰2019演唱会行程</code> 分词后<code>林俊杰/2019/演唱会/行程</code></p>
+<p><code>url2</code> 内容是 <code>林俊杰吴亦凡终于同框合影，粉丝们尖叫连连</code>分词后 <code>林俊杰/吴亦凡/终于/同框/合影 /惹/粉丝们/尖叫/连连</code></p>
+<p>建立索引</p>
+<pre><code>url        	|      keywords
+--------------------------------------
+url1        |      林俊杰,2019,演唱会,行程
+url2        |      林俊杰，吴亦凡，终于，同框，合影 ，粉丝们，尖叫，连连
+</code></pre><p>有点类似 Mysql 索引是 id 对于具体的 row</p>
+<h3 id="优点">优点</h3>
+<p>建立索引非常快，只需要将新增的索引往后追加就可以了。</p>
+<h3 id="缺点">缺点</h3>
+<p>搜索关键字非常困难，因为它必须查看索引的每个内容才能检索与单词相关的所有页面。</p>
+<h3 id="使用场景">使用场景</h3>
+<ul>
+<li>书中的目录</li>
+<li>DNS查询</li>
+</ul>
+<h2 id="倒排索引">倒排索引</h2>
+<pre><code>keywords   |      url
+--------------------------------------
+林俊杰      |      url1,url2
+2019       |      url1
+演唱会      |      url1
+行程        |      url1
+吴亦凡      |      url2
+终于        |      url2
+</code></pre><h3 id="缺点-1">缺点</h3>
+<p>建立索引时比较慢，每次新增的时候需要判断是否存在，然后往里面追加</p>
+<h3 id="优点-1">优点</h3>
+<p>关键字搜索很快</p>
+<h3 id="使用场景-1">使用场景</h3>
+<ul>
+<li>书后面的关键字索引</li>
+<li>搜索引擎</li>
+</ul>
+<h1 id="核心概念">核心概念</h1>
+<h2 id="cluster">cluster</h2>
+<p>代表一个集群，集群中有多个节点</p>
+<ul>
+<li>
+<p>只需要在同一个网段之内启动多个es节点，就可以自动组成一个集群。</p>
+</li>
+<li>
+<p>默认情况下es会自动发现同一网段内的节点，自动组成集群。</p>
+</li>
+<li>
+<p>集群状态查看 <code>http://192.168.57.4:9200/_cluster/health?pretty</code></p>
+</li>
+</ul>
+<h3 id="主节点">主节点</h3>
+<p>这个主节点是可以通过选举产生的，主从节点是对于集群内部来说的。es的一个概念就是去中心化，字面上理解就是无中心节点，这是对于集群外部来说的，因为从外部来看es集群，在逻辑上是个整体，你与任何一个节点的通信和与整个es集群通信是等价的。</p>
+<p>主节点的职责是负责管理集群状态，包括管理分片的状态和副本的状态，以及节点的发现和删除。</p>
+<h2 id="shard">Shard</h2>
+<p>代表索引分片，es可以把一个完整的索引分成多个分片，这样的好处是可以把一个大的索引拆分成多个，分布到不同的节点上。构成分布式搜索。分片的数量只能在索引创建前指定，并且索引创建后不能更改。</p>
+<p>可以在创建索引库时指定</p>
+<pre><code>curl -XPUT 'localhost:9200/index/' -d'{&quot;settings&quot;:{&quot;number_of_shards&quot;:3}}'
+</code></pre><h2 id="replicate">Replicate</h2>
+<p>代表索引副本，es可以给索引设置副本，副本的作用一是提高系统的容错性，当某个节点某个分片损坏或丢失时可以从副本中恢复。二是提高es的查询效率，es会自动对搜索请求进行负载均衡。</p>
+<p>可以在创建索引库的时候指定，默认 1（集R群中总共有2个索引）</p>
+<pre><code>curl -XPUT 'localhost:9200/test2/' -d'{&quot;settings&quot;:{&quot;number_of_replicas&quot;:2}}'
+</code></pre><h2 id="recovery">Recovery</h2>
+<p>代表数据恢复或叫数据重新分布，es在有节点加入或退出时会根据机器的负载对索引分片进行重新分配，挂掉的节点重新启动时也会进行数据恢复。</p>
+<h2 id="gateway">Gateway</h2>
+<p>代表es索引的持久化存储方式，es默认是先把索引存放到内存中，当内存满了时再持久化到硬盘。当这个es集群关闭再重新启动时就会从gateway中读取索引数据。es支持多种类型的gateway，有本地文件系统（默认），分布式文件系统，Hadoop的HDFS和amazon的s3云存储服务。可以配置多个目录</p>
+<p>–如果需要将数据落地到hadoop的hdfs需要先安装插件 elasticsearch-hadoop，然后再elasticsearch.yml配置</p>
+<pre><code>gateway:
+   type: hdfs
+gateway:
+       hdfs:
+          uri: hdfs://localhost:9000
+</code></pre><h2 id="discoveryzen">discovery.zen</h2>
+<p>代表es的自动发现节点机制，es是一个基于p2p的系统，它先通过广播寻找存在的节点，再通过多播协议来进行节点之间的通信，同时也支持点对点的交互。</p>
+<p>如果是不同网段的节点如何组成es集群</p>
+<pre><code>#禁用自动发现机制
+discovery.zen.ping.multicast.enabled: false
+
+#设置新节点被启动时能够发现的主节点列表
+discovery.zen.ping.unicast.hosts: [“192.168.27.4&quot;, &quot; 192.168.17.5&quot;]
+</code></pre><h2 id="transport">Transport</h2>
+<p>代表es内部节点或集群与客户端的交互方式，默认内部是使用TCP协议进行交互，同时它支持http协议（json格式）、thrift、servlet、memcached、zeroMQ等的传输协议（通过插件方式集成）。</p>
+<h2 id="settings和mappings">Settings和Mappings</h2>
+<h3 id="settings">Settings</h3>
+<p>修改索引库默认配置，例如：分片数量，副本数量</p>
+<p>查看：<code>curl -XGET http://localhost:9200/bjsxt/_settings?pretty</code></p>
+<p>设置：</p>
+<pre><code>curl -XPUT 'localhost:9200/bjsxt/' -d'{&quot;settings&quot;:{&quot;number_of_shards&quot;:3,&quot;number_of_replicas&quot;:2}}'
+</code></pre><h3 id="mapping">Mapping</h3>
+<p>对索引库中索引的字段名称及其数据类型进行定义，类似于关系数据库中表建立时要定义字段名及其数据类型那样，(和solr中的schme类似)不过es的mapping比数据库灵活很多，它可以动态添加字段。一般不需要要指定mapping都可以，因为es会自动根据数据格式定义它的类型，如果你需要对某些字段添加特殊属性（如：定义使用其它分词器、是否分词、是否存储等），就必须手动添加mapping</p>
+<p>•查询索引库的mapping信息  <code>curl -XGET http://localhost:9200/bjsxt/emp/_mapping?pretty</code></p>
+<p>mappings修改字段相关属性，例如：字段类型，使用哪种分词工具</p>
+<h1 id="装机配置">装机配置</h1>
+<pre><code>
+
+cluster.name: es_cluster
+
+node.name: node06 
+
+network.host: 192.168.133.6 
+
+http.port:9200 
+
+# 末尾增加防脑裂：
+discovery.zen.ping.multicast.enabled: false 
+discovery.zen.ping.unicast.hosts: [&quot;192.168.133.6&quot;,&quot;192.168.133.7&quot;, &quot;192.168.133.8&quot;]
+discovery.zen.ping_timeout: 120s
+client.transport.ping_timeout: 60s
+
+</code></pre><h1 id="api">API</h1>
+<p><img src="/images/image-20200308220828125.png" alt="image-20200308220828125"></p>
+<h2 id="java-api">Java API</h2>
+<p>使用反射获取Elasticsearch客户端，可以使用通过new获取client</p>
+<p>使用反射方式：网上反映这种方式效率明显高于new客户端，并可避免线上环境内存溢出和超时等问题</p>
+<pre><code>TransportClient client = new TransportClient().addTransportAddress(new InetSocketTransportAddress(&quot;host1&quot;, 9300)).addTransportAddress(new InetSocketTransportAddress(&quot;host2&quot;, 9300));
+// 如果需要使用其他名称的集群（默认是elasticsearch），需要如下设置
+Settings settings = ImmutableSettings.settingsBuilder().put(&quot;cluster.name&quot;, &quot;myClusterName&quot;).build();
+TransportClientclient = new TransportClient(settings).addTransportAddress(new InetSocketTransportAddress(&quot;host1&quot;, 9300));
+
+
+// 索引index（四种json,map,bean,es helpers）
+IndexResponse response = client.prepareIndex(“index&quot;, &quot;type&quot;, &quot;1&quot;).setSource().execute().actionGet();
+// 查询get
+GetResponse response = client.prepareGet(“index&quot;, &quot;type&quot;, &quot;1&quot;).execute().actionGet();
+// 更新update
+//更新或者插入upsert
+// 删除delete
+DeleteResponse response = client.prepareDelete(“index&quot;, &quot;type&quot;, &quot;1&quot;).execute().actionGet();
+// 总数count
+long count = client.prepareCount(“index&quot;).execute().get().getCount();
+
+查询:query
+.setQuery(QueryBuilders.matchQuery(&quot;name&quot;, &quot;test&quot;))
+分页:from/size
+.setFrom(0).setSize(1)
+排序:sort
+.addSort(&quot;age&quot;, SortOrder.DESC)
+过滤:filter
+.setPostFilter(FilterBuilders.rangeFilter(&quot;age&quot;).from(1).to(19))
+高亮:highlight
+
+统计:facet(已废弃)使用aggregations 替代
+根据字段进行分组统计
+根据字段分组，统计其他字段的值
+size设置为0，会获取所有数据，否则，只会返回10条
+
+</code></pre><h3 id="es分页">ES分页</h3>
+<p>与SQL使用LIMIT来控制单“页”数量类似，Elasticsearch使用的是from以及size两个参数：</p>
+<ul>
+<li>
+<p>size：每次返回多少个结果，默认值为10</p>
+</li>
+<li>
+<p>from：从哪条结果开始，默认值为0</p>
+</li>
+</ul>
+<p>假设每页显示5条结果，那么1至3页的请求就是：</p>
+<pre><code>- GET /_search?size=5
+- GET /_search?size=5&amp;from=5
+- GET /_search?size=5&amp;from=10
+</code></pre><p>注意：不要一次请求过多或者页码过大的结果，这么会对服务器造成很大的压力。因为它们会在返回前排序。一个请求会经过多个分片。每个分片都会生成自己的排序结果。然后再进行集中整理，以确保最终结果的正确性。</p>
+<pre><code>timed_out告诉了我们查询是否超时
+curl -XGET http://localhost:9200/_search?timeout=10ms
+es会在10ms之内返回查询内容
+注意：timeout并不会终止查询，它只是会在你指定的时间内返回当时已经查询到的数据，然后关闭连接。在后台，其他的查询可能会依旧继续，尽管查询结果已经被返回了。
+</code></pre><h3 id="批量操作bulk">批量操作bulk</h3>
+<p><img src="/images/image-20200308222921805.png" alt="image-20200308222921805"></p>
+<p>ES的搜索类型有4种</p>
+<ul>
+<li>
+<p>query and fetch(速度最快)(返回N倍数据量)</p>
+</li>
+<li>
+<p>query then fetch（默认的搜索方式）</p>
+</li>
+<li>
+<p>DFS query and fetch(可以更精确控制搜索打分和排名。)</p>
+</li>
+<li>
+<p>DFS query then fetch</p>
+</li>
+</ul>
+<p>•DFS解释：见备注</p>
+<p>•总结一下，从性能考虑QUERY_AND_FETCH是最快的，DFS_QUERY_THEN_FETCH是最慢的。从搜索的准确度来说，DFS要比非DFS的准确度更高。</p>
+<h3 id="分片查询">分片查询</h3>
+<pre><code>默认是randomize across shards
+随机选取，表示随机的从分片中取数据
+_local：指查询操作会优先在本地节点有的分片中查询，没有的话再在其它节点查询。
+_primary：指查询只在主分片中查询
+_primary_first：指查询会先在主分片中查询，如果主分片找不到（挂了），就会在副本中查询。
+_only_node：指在指定id的节点里面进行查询，如果该节点只有查询索引的部分分片，就只在这部分分片中查找，所以查询结果可能不完整。如_only_node:123在节点id为123的节点中查询。
+_prefer_node:nodeid 优先在指定的节点上执行查询
+_shards:0 ,1,2,3,4：查询指定分片的数据
+自定义：_only_nodes：根据多个节点进行查询
+</code></pre><h1 id="优化">优化</h1>
+<h2 id="操作系统">操作系统</h2>
+<ul>
+<li>调大系统的&quot;最大打开文件数&rdquo;,建议32K甚至是64K</li>
+</ul>
+<pre><code>–ulimit -a (查看)
+–ulimit -n 32000(设置)
+</code></pre><h2 id="内存">内存</h2>
+<p>修改配置文件调整ES的JVM内存大小</p>
+<pre><code>1：修改bin/elasticsearch.in.sh中ES_MIN_MEM和ES_MAX_MEM的大小，建议设置一样大，避免频繁的分配内存，根据服务器内存大小，一般分配60%左右(默认256M)
+
+2：如果使用searchwrapper插件启动es的话则修改bin/service/elasticsearch.conf(默认1024M)
+</code></pre><h2 id="内存地址">内存地址</h2>
+<p>设置mlockall来锁定进程的物理内存地址</p>
+<pre><code>避免交换（swapped）来提高性能，修改文件conf/elasticsearch.yml
+
+boostrap.mlockall: true
+</code></pre><h2 id="分片">分片</h2>
+<p>分片可以提升建立索引的能力，5-20个比较合适。如果分片数过少或过多，都会导致检索比较慢。分片数过多会导致检索时打开比较多的文件，另外也会导致多台服务器之间通讯。而分片数过少会导至单个分片索引过大，所以检索速度慢。建议单个分片最多存储20G左右的索引数据，所以，分片数量=数据总量/20G。</p>
+<p>elasticsearch在建立索引时，根据id或id，类型进行hash，得到hash值与该索引的文档数量取余，取余的值即为存入的分片。</p>
+<p>–具体源码为：根据OperationRouting类的shardId方法进行分片</p>
+<h2 id="副本">副本</h2>
+<p>副本多，可以提升搜索的能力，但是如果设置很多副本的话也会对服务器造成额外的压力，因为需要同步数据。所以建议设置2-3个即可。</p>
+<h2 id="index">Index</h2>
+<p>要定时对索引进行优化，不然segment越多，查询的性能就越差，索引量不是很大的话情况下可以将segment设置为1</p>
+<p><code>–curl -XPOST 'http://localhost:9200/bjsxt/_optimize?max_num_segments=1'</code></p>
+<pre><code>client.admin().indices().prepareOptimize(“bjsxt&quot;).setMaxNumSegments(1).get();
+</code></pre><h2 id="mapping-all">Mapping-all</h2>
+<p>去掉mapping中_all域，Index中默认会有_all的域，(相当于solr配置文件中的拷贝字段text)，这个会给查询带来方便，但是会增加索引时间和索引尺寸</p>
+<p><code>&quot;_all&quot;:{&quot;enabled&quot;:&quot;false&quot;}</code></p>
+<h2 id="log">Log</h2>
+<p>log输出的水平默认为trace，即查询超过500ms即为慢查询，就要打印日志，造成cpu和mem，io负载很高。把log输出水平改为info，可以减轻服务器的压力。</p>
+<p>–修改ES_HOME/conf/logging.yaml文件</p>
+<p>–或者修改ES_HOME/conf/elasticsearch.yaml</p>
+<h2 id="其他">其他</h2>
+<ul>
+<li>删除文档</li>
+</ul>
+<p>在Lucene中删除文档，数据不会马上在硬盘上除去，而是在lucene索引中产生一个.del的文件，而在检索过程中这部分数据也会参与检索，lucene在检索过程会判断是否删除了，如果删除了在过滤掉。这样也会降低检索效率。所以可以执行清除删除文档</p>
+<pre><code>curl -XPOST 'http://localhost:9200/elasticsearch/_optimize?only_expunge_deletes=true'
+
+client.admin().indices().prepareOptimize(&quot;elasticsearch &quot;).setOnlyExpungeDeletes(true).get();
+</code></pre><ul>
+<li>首次导入数据</li>
+</ul>
+<p>如果在项目开始的时候需要批量入库大量数据的话，建议将副本数设置为0。因为es在索引数据的时候，如果有副本存在，数据也会马上同步到副本中，这样会对es增加压力。待索引完成后将副本按需要改回来。这样可以提高索引效率</p>
+<h1 id="脑裂">脑裂</h1>
+<p>所谓脑裂问题（类似于精神分裂），就是同一个集群中的不同节点，对于集群的状态有了不一样的理解。</p>
+<p>正常情况下，集群中的所有的节点，应该对集群中master的选择是一致的，这样获得的状态信息也应该是一致的，不一致的状态信息，说明不同的节点对master节点的选择出现了异常——也就是所谓的脑裂问题。这样的脑裂状态直接让节点失去了集群的正确状态，导致集群不能正常工作。</p>
+<pre><code>#用于控制选举行为发生的最小集群节点数量。推荐设为大于1的数值，因为只有在2个以上节点的集群中，主节点才是有意义的
+discovery.zen.minimum_master_nodes
+</code></pre><h2 id="原因">原因</h2>
+<ul>
+<li>
+<p>网络：由于是内网通信，网络通信问题造成某些节点认为master死掉，而另选master。可能性较小</p>
+</li>
+<li>
+<p>节点负载：由于master节点与data节点都是混合在一起的，所以当工作节点的负载较大时，导致对应的ES实例停止响应，而这台服务器如果正充当着master节点的身份，那么一部分节点就会认为这个master节点失效了，故重新选举新的节点，这时就出现了脑裂；同时由于data节点上ES进程占用的内存较大，较大规模的内存回收操作也能造成ES进程失去响应。</p>
+</li>
+</ul>
+<h2 id="解决">解决</h2>
+<pre><code># 主节点
+node.master: true  
+node.data: false  
+# 从节点
+node.master: false  
+node.data: true  
+# 所有节点
+discovery.zen.ping.multicast.enabled: false  
+discovery.zen.ping.unicast.hosts: [“master”, “slave1”, “slave2&quot;]  
+
+</code></pre><p>参考 <code>http://blog.csdn.net/cnweike/article/details/39083089</code></p>
+<h1 id="插件">插件</h1>
+<h2 id="中文分词--ik">中文分词  ik</h2>
+<h4 id="安装">安装</h4>
+<p><a href="https://github.com/medcl/elasticsearch-analysis-ik">https://github.com/medcl/elasticsearch-analysis-ik</a></p>
+<p>编译后放入es 节点的plugins 目录</p>
+<pre><code>分别执行如下命令：
+mvn clean
+mvn compile
+mvn package
+当然这里是用maven对此工程进行编译，前提要安装maven
+Maven安装也很简单，下载包以后解压缩，配置环境变量即可，如图：
+
+</code></pre><h4 id="使用分词">使用分词</h4>
+<h5 id="设置">设置</h5>
+<pre><code>curl -XPOST http://localhost:9200/index/fulltext/_mapping -d'
+{
+    &quot;fulltext&quot;: {
+        &quot;properties&quot;: {
+            &quot;content&quot;: {
+                &quot;type&quot;: &quot;string&quot;,
+                &quot;store&quot;: &quot;no&quot;,
+                &quot;term_vector&quot;: &quot;with_positions_offsets&quot;,
+                &quot;analyzer&quot;: &quot;ik_max_word&quot;,
+                &quot;search_analyzer&quot;: &quot;ik_max_word&quot;,
+                &quot;include_in_all&quot;: &quot;true&quot;,
+                &quot;boost&quot;: 8
+            }
+        }
+    }
+}'
+</code></pre><h5 id="建立索引">建立索引</h5>
+<pre><code>curl -XPOST http://localhost:9200/index/fulltext/1 -d'
+{&quot;content&quot;:&quot;美国留给伊拉克的是个烂摊子吗&quot;}
+'
+curl -XPOST http://localhost:9200/index/fulltext/2 -d'
+{&quot;content&quot;:&quot;公安部：各地校车将享最高路权&quot;}
+'
+curl -XPOST http://localhost:9200/index/fulltext/3 -d'
+{&quot;content&quot;:&quot;中韩渔警冲突调查：韩警平均每天扣1艘中国渔船&quot;}
+'
+curl -XPOST http://localhost:9200/index/fulltext/4 -d'
+{&quot;content&quot;:&quot;中国驻洛杉矶领事馆遭亚裔男子枪击 嫌犯已自首&quot;}
+'
+</code></pre><h5 id="搜索">搜索</h5>
+<pre><code>curl -XPOST http://localhost:9200/index/fulltext/_search  -d'
+{
+    &quot;query&quot; : { &quot;term&quot; : { &quot;content&quot; : &quot;中国&quot; }},
+    &quot;highlight&quot; : {
+        &quot;pre_tags&quot; : [&quot;&lt;tag1&gt;&quot;, &quot;&lt;tag2&gt;&quot;],
+        &quot;post_tags&quot; : [&quot;&lt;/tag1&gt;&quot;, &quot;&lt;/tag2&gt;&quot;],
+        &quot;fields&quot; : {
+            &quot;content&quot; : {}
+        }
+    }
+}
+'
+</code></pre><h5 id="结果">结果</h5>
+<pre><code>{
+    &quot;took&quot;: 14,
+    &quot;timed_out&quot;: false,
+    &quot;_shards&quot;: {
+        &quot;total&quot;: 5,
+        &quot;successful&quot;: 5,
+        &quot;failed&quot;: 0
+    },
+    &quot;hits&quot;: {
+        &quot;total&quot;: 2,
+        &quot;max_score&quot;: 2,
+        &quot;hits&quot;: [
+            {
+                &quot;_index&quot;: &quot;index&quot;,
+                &quot;_type&quot;: &quot;fulltext&quot;,
+                &quot;_id&quot;: &quot;4&quot;,
+                &quot;_score&quot;: 2,
+                &quot;_source&quot;: {
+                    &quot;content&quot;: &quot;中国驻洛杉矶领事馆遭亚裔男子枪击 嫌犯已自首&quot;
+                },
+                &quot;highlight&quot;: {
+                    &quot;content&quot;: [
+                        &quot;&lt;tag1&gt;中国&lt;/tag1&gt;驻洛杉矶领事馆遭亚裔男子枪击 嫌犯已自首 &quot;
+                    ]
+                }
+            },
+            {
+                &quot;_index&quot;: &quot;index&quot;,
+                &quot;_type&quot;: &quot;fulltext&quot;,
+                &quot;_id&quot;: &quot;3&quot;,
+                &quot;_score&quot;: 2,
+                &quot;_source&quot;: {
+                    &quot;content&quot;: &quot;中韩渔警冲突调查：韩警平均每天扣1艘中国渔船&quot;
+                },
+                &quot;highlight&quot;: {
+                    &quot;content&quot;: [
+                        &quot;均每天扣1艘&lt;tag1&gt;中国&lt;/tag1&gt;渔船 &quot;
+                    ]
+                }
+            }
+        ]
+    }
+}
+</code></pre><h2 id="head">head</h2>
+<p>不用在es 中安装插件
+<code>https://chrome.google.com/webstore/detail/elasticsearch-head/ffmkiejjmecolpfloofpjologoblkegm/related</code></p>
+
+  </section>
+
+  <section>
+    
+      
+    
+  </section>
+</article>
+
+      </div>
+
+      <div id="side" class="pr-1 bg-white">
+        <aside class="pr-3">
+          
+  
+    <div id="toc" class="Box Box--blue mb-3">
+      <b>ElasticSearch 入门级</b><nav id="TableOfContents">
+  <ul>
+    <li>
+      <ul>
+        <li><a href="#例如">例如</a></li>
+        <li><a href="#优点">优点</a></li>
+        <li><a href="#缺点">缺点</a></li>
+        <li><a href="#使用场景">使用场景</a></li>
+      </ul>
+    </li>
+    <li><a href="#倒排索引">倒排索引</a>
+      <ul>
+        <li><a href="#缺点-1">缺点</a></li>
+        <li><a href="#优点-1">优点</a></li>
+        <li><a href="#使用场景-1">使用场景</a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <ul>
+    <li><a href="#cluster">cluster</a>
+      <ul>
+        <li><a href="#主节点">主节点</a></li>
+      </ul>
+    </li>
+    <li><a href="#shard">Shard</a></li>
+    <li><a href="#replicate">Replicate</a></li>
+    <li><a href="#recovery">Recovery</a></li>
+    <li><a href="#gateway">Gateway</a></li>
+    <li><a href="#discoveryzen">discovery.zen</a></li>
+    <li><a href="#transport">Transport</a></li>
+    <li><a href="#settings和mappings">Settings和Mappings</a>
+      <ul>
+        <li><a href="#settings">Settings</a></li>
+        <li><a href="#mapping">Mapping</a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <ul>
+    <li><a href="#java-api">Java API</a>
+      <ul>
+        <li><a href="#es分页">ES分页</a></li>
+        <li><a href="#批量操作bulk">批量操作bulk</a></li>
+        <li><a href="#分片查询">分片查询</a></li>
+      </ul>
+    </li>
+  </ul>
+
+  <ul>
+    <li><a href="#操作系统">操作系统</a></li>
+    <li><a href="#内存">内存</a></li>
+    <li><a href="#内存地址">内存地址</a></li>
+    <li><a href="#分片">分片</a></li>
+    <li><a href="#副本">副本</a></li>
+    <li><a href="#index">Index</a></li>
+    <li><a href="#mapping-all">Mapping-all</a></li>
+    <li><a href="#log">Log</a></li>
+    <li><a href="#其他">其他</a></li>
+  </ul>
+
+  <ul>
+    <li><a href="#原因">原因</a></li>
+    <li><a href="#解决">解决</a></li>
+  </ul>
+
+  <ul>
+    <li><a href="#中文分词--ik">中文分词  ik</a>
+      <ul>
+        <li></li>
+      </ul>
+    </li>
+    <li><a href="#head">head</a></li>
+  </ul>
+</nav></div>
+  
+
+  
+    <div>
+      
+    </div>
+  
+
+        </aside>
+      </div>
+
+      <div id="footer" class="pt-2 pb-3 bg-white text-center">
+        
+
+  <span class="text-small text-gray">
+    
+
+    Powered by the
+    <a href="https://github.com/qqhann/hugo-primer" class="link-gray-dark">Hugo-Primer</a> theme for
+    <a href="https://gohugo.io" class="link-gray-dark">Hugo</a>.
+  </span>
+
+
+      </div>
+    </div>
+
+    
+    
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/x-mathjax-config">MathJax.Hub.Config({ tex2jax: { inlineMath: [['$','$'], ['\\(','\\)']] } });</script>
+    
+  </body>
+</html>

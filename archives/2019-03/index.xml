@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>2019-03 on chouc</title>
+    <link>http://localhost:1313/archives/2019-03/</link>
+    <description>Recent content in 2019-03 on chouc</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <lastBuildDate>Tue, 05 Mar 2019 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="http://localhost:1313/archives/2019-03/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>ElasticSearch 入门级</title>
+      <link>http://localhost:1313/es/</link>
+      <pubDate>Tue, 05 Mar 2019 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/es/</guid>
+      <description>Elasticsearch是一个基于Apache Lucene(TM)的开源搜索引擎。无论在开源还是专有领域，Lucene可以被认为是迄今为止</description>
+    </item>
+    
+    <item>
+      <title>Mysql 索引</title>
+      <link>http://localhost:1313/sql-%E9%A2%84%E7%83%AD/</link>
+      <pubDate>Tue, 05 Mar 2019 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/sql-%E9%A2%84%E7%83%AD/</guid>
+      <description>SQL 预热 1. 常见的 Join 查询图 索引优化分析 1. 索引的概念 1.1 是什么 MySQL 官方对索引的定义为：索引（Index）是帮助 MySQL 高效获取数据的数据结构。可以得到索引的</description>
+    </item>
+    
+    <item>
+      <title>Redis 入门级</title>
+      <link>http://localhost:1313/redis/</link>
+      <pubDate>Tue, 05 Mar 2019 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/redis/</guid>
+      <description>众所周知Redis是一个使用ANSI C编写的开源、支持网络、基于内存、可选持久性的键值对存储数据库。从2015年6月开始，Redis的开发由</description>
+    </item>
+    
+    <item>
+      <title>Spark DStream的源码和原理</title>
+      <link>http://localhost:1313/dstream/</link>
+      <pubDate>Tue, 05 Mar 2019 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/dstream/</guid>
+      <description>众所周知 Spark Streaming是核心Spark API的扩展，可实现实时数据流的可伸缩，高吞吐量，容错流处理。可以从许多数据源（例如Kafka，</description>
+    </item>
+    
+    <item>
+      <title>Spark 内存管理</title>
+      <link>http://localhost:1313/spark%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</link>
+      <pubDate>Tue, 05 Mar 2019 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/spark%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86/</guid>
+      <description>转自 http://arganzheng.life/spark-executor-memory-management.html 我们都知道 Spark 能够有效的利用内存并进行分布式计算，其内存管理模块在整个系统中扮演着非常重要的角色。为了更好地利用 Spark，深入地理解其</description>
+    </item>
+    
+    <item>
+      <title>Synchronize 总结</title>
+      <link>http://localhost:1313/%E5%A4%9A%E7%BA%BF%E7%A8%8B%E6%80%BB%E7%BB%93/</link>
+      <pubDate>Tue, 05 Mar 2019 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/%E5%A4%9A%E7%BA%BF%E7%A8%8B%E6%80%BB%E7%BB%93/</guid>
+      <description>Synchronize 总结 原理 通过获取底层的对象或者类的 monitor 权限，拥有monitor 权的线程拥有执行权。 monitor 本质又是通过操作系统底层的 Mutex Lock 来实现。 通过 javap -c 可以看到 sync</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    
+    
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-12345678-0', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+    
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+      
+  Mysql 索引 &ndash; chouc
+
+    </title>
+    
+    
+    <meta name="description" property="og:description" content="SQL 预热 1. 常见的 Join 查询图 索引优化分析 1. 索引的概念 1.1 是什么 MySQL 官方对索引的定义为：索引（Index）是帮助 MySQL 高效获取数据的数据结构。可以得到索引的|chouc&#39;s blog">
+    
+
+    <meta name="apple-mobile-web-app-title" content="chouc">
+    
+    
+    
+    
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:site" content="@">
+    <meta name="twitter:creator" content="@">
+    <meta name="twitter:title" content="Mysql 索引 | chouc">
+    <meta name="twitter:description" content="SQL 预热 1. 常见的 Join 查询图 索引优化分析 1. 索引的概念 1.1 是什么 MySQL 官方对索引的定义为：索引（Index）是帮助 MySQL 高效获取数据的数据结构。可以得到索引的|chouc&#39;s blog">
+    <meta name="twitter:image" content="http://localhost:1313/twitter-card.png">
+    
+
+
+    <link rel="stylesheet" href="/assets/syntax.css">
+    <link rel="stylesheet" href="/assets/primer-build.css">
+    <link rel="stylesheet" href="/assets/style.css">
+  </head>
+
+
+  <body class="bg-gray">
+    <div id="holy" class="container-lg bg-white h-100">
+
+      <div id="header" class="px-1 bg-white">
+        <nav class="UnderlineNav UnderlineNav--right px-2">
+  <a class="UnderlineNav-actions muted-link h2" href="http://localhost:1313/">
+    chouc
+  </a>
+
+  
+  
+  <div class="UnderlineNav-body">
+    
+    
+    
+    <a class="UnderlineNav-item " href="/">
+      
+      <span>Blog</span>
+    </a>
+    
+    
+    
+    
+    <a class="UnderlineNav-item " href="/about/">
+      
+      <span>About</span>
+    </a>
+    
+    
+  </div>
+  
+</nav>
+
+      </div>
+
+      <div role="main" id="main" class="holy-main markdown-body px-4 bg-white">
+        
+
+<div class="Subhead">
+  <div class="Subhead-heading">
+    <div class="h1 mt-3 mb-1">Mysql 索引</div>
+  </div>
+  <div class="Subhead-description">
+    
+
+
+<a href='/categories/bigdata' class="muted-link">
+  <span class="Label Label--gray-darker">Bigdata</span>
+</a>
+
+
+
+<a href='/tags/mysql' class="muted-link">
+  <span class="Label Label--gray">mysql</span>
+</a>
+
+
+    
+    <div class="float-md-right">
+      <span title="Lastmod: 2019-03-05. Published at: 2019-03-05.">
+        
+          Published: 2019-03-05
+        
+      </span>
+    </div>
+    
+  </div>
+</div>
+<article>
+  
+  <section class="pb-6 mb-3 border-bottom">
+    <h1 id="sql-预热">SQL 预热</h1>
+<h2 id="1-常见的-join-查询图">1. 常见的 Join 查询图</h2>
+<p><img src="/images/image-20200324225635352.png" alt="image-20200324225635352"></p>
+<h1 id="索引优化分析">索引优化分析</h1>
+<h2 id="1-索引的概念">1. 索引的概念</h2>
+<h3 id="11-是什么">1.1 是什么</h3>
+<p>MySQL 官方对索引的定义为：索引（Index）是帮助 MySQL 高效获取数据的数据结构。可以得到索引的本质：
+<strong>索引是数据结构。可以简单理解为排好序的快速查找数据结构</strong>。
+在数据之外，数据库系统还维护着满足特定查找算法的数据结构，这些数据结构以某种方式引用（指向）数据，
+这样就可以在这些数据结构上实现高级查找算法。这种数据结构，就是索引。下图就是一种可能的索引方式示例：</p>
+<p><img src="/images/image-20200324230727497.png" alt="image-20200324230727497"></p>
+<p>左边是数据表，一共有两列七条记录，最左边的是数据记录的物理地址。为了加快 Col2 的查找，可以维护一个
+右边所示的二叉查找树，每个节点分别包含索引键值和一个指向对应数据记录物理地址的指 针，这样就可以运用
+二叉查找在一定的复杂度内获取到相应数据，从而快速的检索出符合条件的记录。
+一般来说索引本身也很大，不可能全部存储在内存中，因此索引往往以索引文件的形式存储的磁盘上。</p>
+<h3 id="12-优缺点">1.2 优缺点</h3>
+<p><strong>优势：</strong></p>
+<ul>
+<li>提高数据检索的效率，降低数据库的IO成本。</li>
+<li>通过索引列对数据进行排序，降低数据排序的成本，降低了CPU的消耗</li>
+</ul>
+<p><strong>劣势：</strong></p>
+<ul>
+<li>降低更新表的速度，如对表进行INSERT、UPDATE和DELETE。因为更新表时，MySQL不仅要保存数据，还要保存一下索引文件每次更新添加了索引列的字段，都会调整因为更新所带来的键值变化后的索引信息。</li>
+<li>实际上索引也是一张表，该表保存了主键与索引字段，并指向实体表的记录，所以索引列也是要占用空间
+的</li>
+</ul>
+<h2 id="2-mysql-的索引">2. Mysql 的索引</h2>
+<h3 id="21-btree-索引">2.1 Btree 索引</h3>
+<p>MySQL 使用的是 Btree 索引</p>
+<p><img src="/images/image-20200324231019811.png" alt="image-20200324231019811"></p>
+<p><strong>【初始化介绍】</strong></p>
+<p>一颗 b 树，浅蓝色的块我们称之为一个磁盘块，可以看到每个磁盘块包含几个数据项（深蓝色所示）和指针（黄色所示），如磁盘块 1 包含数据项 17 和 35，包含指针 P1、P2、P3，P1 表示小于 17 的磁盘块，P2 表示在 17 和 35 之间的磁盘块，P3 表示大于 35 的磁盘块。真实的数据存在于叶子节点即 3、5、9、10、13、15、28、29、36、60、75、79、90、99。非叶子节点只不存储真实的数据，只存储指引搜索方向的数据项，如 17、35 并不真实存在于数据表中。</p>
+<p><strong>【查找过程】</strong>
+如果要查找数据项 29，那么首先会把磁盘块 1 由磁盘加载到内存，此时发生一次 IO，在内存中用二分查找确定 29在 17 和 35 之间，锁定磁盘块 1 的 P2 指针，内存时间因为非常短（相比磁盘的 IO）可以忽略不计，通过磁盘块 1的 P2 指针的磁盘地址把磁盘块 3 由磁盘加载到内存，发生第二次 IO，29 在 26 和 30 之间，锁定磁盘块 3 的 P2 指针，通过指针加载磁盘块 8 到内存，发生第三次 IO，同时内存中做二分查找找到 29，结束查询，总计三次 IO。</p>
+<p>真实的情况是，3 层的 b+树可以表示上百万的数据，如果上百万的数据查找只需要三次 IO，性能提高将是巨大的，如果没有索引，每个数据项都要发生一次 IO，那么总共需要百万次的 IO，显然成本非常非常高。</p>
+<h3 id="22-btree-索引">2.2 B+tree 索引</h3>
+<p><img src="/images/image-20200324231415381.png" alt="image-20200324231415381"></p>
+<p>B+Tree 与 B-Tree 的区别</p>
+<p>1）B-树的关键字和记录是放在一起的，叶子节点可以看作外部节点，不包含任何信息；B+树的非叶子节点中只有关键字和指向下一个节点的索引，记录只放在叶子节点中。
+2）在 B-树中，越靠近根节点的记录查找时间越快，只要找到关键字即可确定记录的存在；而 B+树中每个记录
+的查找时间基本是一样的，都需要从根节点走到叶子节点，而且在叶子节点中还要再比较关键字。从这个角度看 B-树的性能好像要比 B+树好，而在实际应用中却是 B+树的性能要好些。因为 B+树的非叶子节点不存放实际的数据，这样每个节点可容纳的元素个数比 B-树多，树高比 B-树小，这样带来的好处是减少磁盘访问次数。尽管 B+树找到一个记录所需的比较次数要比 B-树多，但是一次磁盘访问的时间相当于成百上千次内存比较的时间，因此实际中B+树的性能可能还会好些，而且 B+树的叶子节点使用指针连接在一起，方便顺序遍历（例如查看一个目录下的所有文件，一个表中的所有记录等），这也是很多数据库和文件系统使用 B+树的缘故。</p>
+<p>思考：为什么说 B+树比 B-树更适合实际应用中操作系统的文件索引和数据库索引？</p>
+<ul>
+<li>B+树的磁盘读写代价更低
+B+树的内部结点并没有指向关键字具体信息的指针。因此其内部结点相对 B 树更小。如果把所有同一内部结点的关键字存放在同一盘块中，那么盘块所能容纳的关键字数量也越多。一次性读入内存中的需要查找的关键字也就越多。相对来说 IO 读写次数也就降低了。</li>
+<li>B+树的查询效率更加稳定
+由于非终结点并不是最终指向文件内容的结点，而只是叶子结点中关键字的索引。所以任何关键字的查找必须
+走一条从根结点到叶子结点的路。所有关键字查询的路径长度相同，导致每一个数据的查询效率相当。</li>
+</ul>
+<h3 id="23-聚簇索引和非聚簇索引">2.3 聚簇索引和非聚簇索引</h3>
+<p>聚簇索引并不是一种单独的索引类型，而是一种数据存储方式。术语‘聚簇’表示数据行和相邻的键值聚簇的存储
+在一起。如下图，左侧的索引就是聚簇索引，因为数据行在磁盘的排列和索引排序保持一致。</p>
+<p><img src="/images/image-20200324231828878.png" alt="image-20200324231828878"></p>
+<ul>
+<li>聚簇索引的好处：
+按照聚簇索引排列顺序，查询显示一定范围数据的时候，由于数据都是紧密相连，数据库不不用从多
+个数据块中提取数据，所以节省了大量的 io 操作。</li>
+<li>聚簇索引的限制：
+对于 mysql 数据库目前只有 innodb 数据引擎支持聚簇索引，而 Myisam 并不支持聚簇索引。
+由于数据物理存储排序方式只能有一种，所以每个 Mysql 的表只能有一个聚簇索引。一般情况下就是
+该表的主键。
+为了充分利用聚簇索引的聚簇的特性，所以 innodb 表的主键列尽量选用有序的顺序 id，而不建议用
+无序的 id，比如 uuid 这种。</li>
+</ul>
+<h3 id="24-时间复杂度扩展">2.4 时间复杂度（扩展）</h3>
+<p>​	同一问题可用不同算法解决，而一个算法的质量优劣将影响到算法乃至程序的效率。算法分析的
+目的在于选择合适算法和改进算法。
+​	时间复杂度是指执行算法所需要的计算工作量，用大 O 表示记为：O(…)</p>
+<p><img src="/images/image-20200324232003529.png" alt="image-20200324232003529"></p>
+<p><img src="/images/image-20200324232014765.png" alt="image-20200324232014765"></p>
+<h2 id="3mysql-索引分类">3.Mysql 索引分类</h2>
+<h3 id="31-单值索引">3.1 单值索引</h3>
+<p>概念：即一个索引只包含单个列，一个表可以有多个单列索引
+语法：</p>
+<pre><code>建表时：
+CREATE TABLE customer (
+    id INT(10) UNSIGNED AUTO_INCREMENT,
+    customer_no VARCHAR(200),
+    customer_name VARCHAR(200),
+    PRIMARY KEY(id),
+    KEY(customer_name)
+);
+建表后：
+CREATE INDEX idx_customer_name ON customer(customer_name);
+
+</code></pre><h3 id="32-唯一索引">3.2 唯一索引</h3>
+<p>概念：索引列的值必须唯一，但允许有空值</p>
+<pre><code>建表时：
+CREATE TABLE customer (
+    id INT(10) UNSIGNED AUTO_INCREMENT,
+    customer_no VARCHAR(200),
+    customer_name VARCHAR(200),
+    PRIMARY KEY(id),
+    KEY (customer_name),
+    UNIQUE (customer_no)
+);
+建表后：
+CREATE UNIQUE INDEX idx_customer_no ON customer(customer_no);
+</code></pre><h3 id="33-主键索引">3.3 主键索引</h3>
+<p>概念：设定为主键后数据库会自动建立索引，innodb为聚簇索引</p>
+<pre><code>建表时：
+CREATE TABLEcustomer(
+    id INT(10) UNSIGNED AUTO_INCREMENT,
+    customer_no VARCHAR(200),
+    customer_name VARCHAR(200),
+    PRIMARY KEY(id)
+);
+建表后：
+ALTER TABLE customer add PRIMARY KEY customer(customer_no);
+ALTER TABLE customer drop PRIMARY KEY ;
+必须先删除掉(drop)原索引，再新建(add)索引
+</code></pre><h3 id="34-复合索引">3.4 复合索引</h3>
+<pre><code>建表时：
+CREATE TABLE customer (
+    id INT(10) UNSIGNED AUTO_INCREMENT,
+    customer_no VARCHAR(200),
+    customer_name VARCHAR(200),
+    PRIMARY KEY(id),
+    KEY(customer_no,customer_name)
+);
+建表后：
+CREATEINDEX idx_no_name ON customer(customer_no,customer_name);
+</code></pre><h3 id="35-基本语法">3.5 基本语法</h3>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>命令</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>创建</td>
+<td>CREATE [UNIQUE ] INDEX [indexName] ON table_name(column))</td>
+</tr>
+<tr>
+<td>删除</td>
+<td>DROP INDEX [indexName] ON mytable;</td>
+</tr>
+<tr>
+<td>查看</td>
+<td>SHOW INDEX FROM table_name\G</td>
+</tr>
+<tr>
+<td>使 用 Alter 命令</td>
+<td>ALTER TABLE tbl_name ADD PRIMARY KEY (column_list) : 该语句添加一个主键，这意味着索引值必须是唯一的，且不能为 NULL。</td>
+</tr>
+<tr>
+<td></td>
+<td>ALTER TABLE tbl_name ADD PRIMARY KEY (column_list)</td>
+</tr>
+<tr>
+<td></td>
+<td>ALTER TABLE tbl_name ADD INDEX index_name (column_list): 添加普通索引，索引值可出现多次。</td>
+</tr>
+<tr>
+<td></td>
+<td>ALTER TABLE tbl_name ADD FULLTEXT index_name (column_list):该语句指定了索引为 FULLTEXT ，用于全文索引。</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4索引的创建时机">4.索引的创建时机</h2>
+<h3 id="41-适合创建索引的情况">4.1 适合创建索引的情况</h3>
+<ul>
+<li>主键自动建立唯一索引；</li>
+<li>频繁作为查询条件的字段应该创建索引</li>
+<li>查询中与其它表关联的字段，外键关系建立索引</li>
+<li>单键/组合索引的选择问题， 组合索引性价比更高</li>
+<li>查询中排序的字段，排序字段若通过索引去访问将大大提高排序速度</li>
+<li>查询中统计或者分组字段</li>
+</ul>
+<h3 id="42-不适合创建索引的情况">4.2 不适合创建索引的情况</h3>
+<ul>
+<li>表记录太少</li>
+<li>经常增删改的表或者字段</li>
+<li>Where 条件里用不到的字段不创建索引</li>
+<li>过滤性不好的不适合建索引</li>
+</ul>
+
+  </section>
+
+  <section>
+    
+      
+    
+  </section>
+</article>
+
+      </div>
+
+      <div id="side" class="pr-1 bg-white">
+        <aside class="pr-3">
+          
+  
+    <div id="toc" class="Box Box--blue mb-3">
+      <b>Mysql 索引</b><nav id="TableOfContents">
+  <ul>
+    <li><a href="#1-常见的-join-查询图">1. 常见的 Join 查询图</a></li>
+  </ul>
+
+  <ul>
+    <li><a href="#1-索引的概念">1. 索引的概念</a>
+      <ul>
+        <li><a href="#11-是什么">1.1 是什么</a></li>
+        <li><a href="#12-优缺点">1.2 优缺点</a></li>
+      </ul>
+    </li>
+    <li><a href="#2-mysql-的索引">2. Mysql 的索引</a>
+      <ul>
+        <li><a href="#21-btree-索引">2.1 Btree 索引</a></li>
+        <li><a href="#22-btree-索引">2.2 B+tree 索引</a></li>
+        <li><a href="#23-聚簇索引和非聚簇索引">2.3 聚簇索引和非聚簇索引</a></li>
+        <li><a href="#24-时间复杂度扩展">2.4 时间复杂度（扩展）</a></li>
+      </ul>
+    </li>
+    <li><a href="#3mysql-索引分类">3.Mysql 索引分类</a>
+      <ul>
+        <li><a href="#31-单值索引">3.1 单值索引</a></li>
+        <li><a href="#32-唯一索引">3.2 唯一索引</a></li>
+        <li><a href="#33-主键索引">3.3 主键索引</a></li>
+        <li><a href="#34-复合索引">3.4 复合索引</a></li>
+        <li><a href="#35-基本语法">3.5 基本语法</a></li>
+      </ul>
+    </li>
+    <li><a href="#4索引的创建时机">4.索引的创建时机</a>
+      <ul>
+        <li><a href="#41-适合创建索引的情况">4.1 适合创建索引的情况</a></li>
+        <li><a href="#42-不适合创建索引的情况">4.2 不适合创建索引的情况</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav></div>
+  
+
+  
+    <div>
+      
+    </div>
+  
+
+        </aside>
+      </div>
+
+      <div id="footer" class="pt-2 pb-3 bg-white text-center">
+        
+
+  <span class="text-small text-gray">
+    
+
+    Powered by the
+    <a href="https://github.com/qqhann/hugo-primer" class="link-gray-dark">Hugo-Primer</a> theme for
+    <a href="https://gohugo.io" class="link-gray-dark">Hugo</a>.
+  </span>
+
+
+      </div>
+    </div>
+
+    
+    
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/x-mathjax-config">MathJax.Hub.Config({ tex2jax: { inlineMath: [['$','$'], ['\\(','\\)']] } });</script>
+    
+  </body>
+</html>
